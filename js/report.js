@@ -50,7 +50,7 @@ function lookalike() {
 }
 
 function report() {
-  setWhatif(false); pad(false);
+  setWhatif(false); pad(false); inRun(false);
   const s = score(), r = S.run, [la, ld] = lookalike();
   setScene({ draw(dt) { clear(); stars(4, 0, dt); } });
   const rows = [['Mission design', s.design], ['Science', s.science], ['Longevity', s.longevity], ['Manual piloting', s.manual], ['Team goals', s.team], ['Failsafes used', s.penalty ? -s.penalty : 0]];

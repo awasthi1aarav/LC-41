@@ -45,7 +45,7 @@ const STEPS = [
 ];
 
 function designScreen(step) {
-  setWhatif(false); pad(false);
+  setWhatif(false); pad(false); inRun(false);
   if (step !== undefined) STEP = step;
   setScene({ draw() { clear(); stars(3, 0, 1 / 60); } });
   const d = S.design, go = {};
@@ -56,7 +56,7 @@ function designScreen(step) {
     const who = st.role && S.mode === 'crew' ? `<span class="tag">${ROLES[st.role].name} · ${esc(nameFor(st.role))}</span>` : '';
     let body = '';
     if (STEP === 0) body = `${Object.entries(OBJECTIVES).map(([k, o]) => opt('obj', k, o.name, o.desc)).join('')}
-      <p style="text-align:center;margin-top:14px"><button id="real">⚡ QUICK START: use the real 1977 Voyager design</button></p>`;
+      <p style="text-align:center;margin-top:14px"><button id="real">⚡ QUICK START: use the real 1977 Voyager design</button></p>${S.diff === 'director' ? '<p class="muted" style="text-align:center">On Flight Director the real design is $15M over budget. You\'ll have to cut something.</p>' : ''}`;
     if (STEP === 1) body = `<h3>ROCKET</h3><div class="cols">${Object.entries(LVS).map(([k, o]) => opt('lv', k, o.name, `Lifts up to ${o.max} kg · $${o.cost}M<br>${o.desc}`)).join('')}</div>
       <h3>LAUNCH DATE</h3><div class="cols3">${Object.entries(WINDOWS).map(([k, o]) => opt('win', k, o.name, `${o.cost ? '+$' + o.cost + 'M · ' : ''}${o.desc}`)).join('')}</div>`;
     if (STEP === 2) body = `<h3>SPACECRAFT BODY</h3><div class="cols">${Object.entries(BUSES).map(([k, o]) => opt('bus', k, o.name, `${o.mass} kg · $${o.cost}M<br>${o.desc}`)).join('')}</div>

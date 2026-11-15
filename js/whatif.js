@@ -42,7 +42,7 @@ function nameAI(next) {
   setScene({ draw(dt) { clear(); stars(2, 0, dt); voyager(W / 2, H / 2 + 50, 2, Math.sin(G.t) * .1); } });
   ui(`<div class="center"><div class="box"><p class="px" style="font-size:10px">SELF-AWARENESS: ONLINE</p><h2>WHAT SHALL I CALL MYSELF?</h2>
     <p><input type="text" id="nm" maxlength="12" value="${esc(S.aiName)}"></p><button class="big" id="go">AWAKEN ▶</button></div></div>`);
-  const go = () => { S.aiName = ($('#nm').value.trim() || 'ECHO').toUpperCase(); sfx.ok(); next(); };
+  const go = () => { S.aiName = ($('#nm').value.replace(/[<>&"']/g, '').trim() || 'ECHO').toUpperCase().slice(0, 12); sfx.ok(); next(); };
   $('#go').onclick = go; $('#nm').onkeydown = e => { if (e.key === 'Enter') go(); }; $('#nm').focus(); $('#nm').select();
 }
 
@@ -50,16 +50,20 @@ function nameAI(next) {
 function scanScene(next) {
   const run = S.run, target = Math.floor(Math.random() * 8);
   const bonus = ['MAG', 'PWS'].filter(id => run.c.flown.some(i => i.id === id)).length;
-  let pings = 3 + bonus, reads = {}, found = false, endAt = 0;
+  let pings = 3 + bonus, reads = {}, found = false, endAt = 0, sel = 0;
   run.mothFuel = 100;
   ui(''); pad(false);
   const sectorAt = (x, y) => { const a = Math.atan2(y - H / 2, x - W / 2); return ((Math.round(a / (Math.PI / 4)) % 8) + 8) % 8; };
   setScene({
-    help: { title: 'FIND THE ASTEROID', goal: 'Click a slice of the radar to ping it. WARM = next to it, FOUND = got it.', keys: [['CLICK', 'ping a slice']] },
+    help: { title: 'FIND THE ASTEROID', goal: 'Click a slice of the radar to ping it. WARM = next to it, FOUND = got it.', keys: [['CLICK', 'ping a slice'], ['← → + SPACE', 'or pick a slice with keys']] },
     update() {
       if (endAt) { if (this.t > endAt) { this.update = null; run.manual.Scan = found ? clamp(40 + pings * 20, 0, 100) : 20; next(); } return; }
-      if (this.t > .3 && M.clicked && Math.hypot(M.x - W / 2, M.y - H / 2) > 20) {
-        const s = sectorAt(M.x, M.y); if (reads[s] !== undefined) return;
+      if (hit('ArrowRight') || hit('ArrowDown')) { sel = (sel + 1) % 8; sfx.tick(); }
+      if (hit('ArrowLeft') || hit('ArrowUp')) { sel = (sel + 7) % 8; sfx.tick(); }
+      const byMouse = M.clicked && Math.hypot(M.x - W / 2, M.y - H / 2) > 20;
+      if (this.t > 30) { found = false; endAt = this.t + 2.5; run.mothFuel = 70; reads[target] = 0; return; }
+      if (this.t > .3 && (byMouse || hit(' ') || hit('Enter'))) {
+        const s = byMouse ? sectorAt(M.x, M.y) : sel; if (reads[s] !== undefined) return;
         pings--; const dd = Math.min((s - target + 8) % 8, (target - s + 8) % 8); reads[s] = dd; beep(1400 - dd * 300, .15, 'sine', .06);
         if (dd === 0) { found = true; endAt = this.t + 2; sfx.ok(); }
         else if (pings <= 0) { found = false; endAt = this.t + 2.5; run.mothFuel = 70; reads[target] = 0; sfx.bad(); }
@@ -79,11 +83,12 @@ function scanScene(next) {
         const a2 = a + Math.PI / 8; rect(cx + Math.cos(a2) * R, cy + Math.sin(a2) * R, 1, 1, c.fg);
         ctx.strokeStyle = c.dim; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(a2) * R, cy + Math.sin(a2) * R); ctx.stroke();
       }
+      { const a = sel * Math.PI / 4; ctx.strokeStyle = c.hi; ctx.beginPath(); ctx.arc(cx, cy, R + 4, a - Math.PI / 8, a + Math.PI / 8); ctx.stroke(); }
       const sw = G.t * 2; ctx.strokeStyle = c.fg; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(sw) * R, cy + Math.sin(sw) * R); ctx.stroke();
       voyager(cx, cy, .8);
       if (found || endAt) { const a = target * Math.PI / 4; disc(cx + Math.cos(a) * 95, cy + Math.sin(a) * 95, 4, c.acc); }
-      txt(`DEEP SCAN · pings left ${pings}${bonus ? ` (+${bonus} from MAG/PWS)` : ''} · click a sector`, W / 2, 14, c.hi, 16, 'center');
-      if (endAt) txt(found ? 'TARGET LOCKED' : 'Out of pings. Found it the hard way: MOTH starts with 70% fuel.', W / 2, H - 14, c.hi, 16, 'center');
+      txt(`DEEP SCAN · pings left ${pings}${bonus ? ` (+${bonus} from MAG/PWS)` : ''} · ${Math.max(0, 30 - this.t).toFixed(0)} s`, W / 2, 14, c.hi, 16, 'center');
+      if (endAt) txt(found ? 'TARGET LOCKED' : 'Found it the hard way: MOTH starts with 70% fuel.', W / 2, H - 14, c.hi, 16, 'center');
     }
   });
 }
@@ -94,7 +99,7 @@ const PORT = { x: 84, y: 135 };
 function droneScene(mode, next) {
   const run = S.run;
   const p = mode === 'land' ? { x: 96, y: 135, vx: 0, vy: 0 } : { x: AST.x - AST.r - 6, y: AST.y, vx: 0, vy: 0 };
-  let fuel = mode === 'land' ? run.mothFuel : Math.max(35, run.mothFuel), dmg = 0, state = 'fly', msg = '', msgT = 0, t0 = 0, trail = [];
+  let fuel = mode === 'land' ? run.mothFuel : Math.max(35, run.mothFuel), dryT = 0, dmg = 0, state = 'fly', msg = '', msgT = 0, t0 = 0, trail = [];
   ui(''); pad(true);
   const say = m => { msg = m; msgT = 2.5; };
   setScene({
@@ -125,9 +130,10 @@ function droneScene(mode, next) {
           else { const nx = (p.x - AST.x) / da, ny = (p.y - AST.y) / da; p.x = AST.x + nx * (AST.r + 2); p.y = AST.y + ny * (AST.r + 2); p.vx *= .2; p.vy *= .2; }
         }
       }
-      if (dmg >= 3 || (fuel <= 0 && sp < 1 && this.t > 3) || this.t > 75) {
+      dryT = fuel <= 0 ? dryT + dt : 0;
+      if (dmg >= 3 || dryT > 8 || this.t > 75) {
         state = 'lost'; t0 = this.t + 2.5; sfx.bad();
-        if (mode === 'land') { run.flags.moth = 'lost'; run.ore = 0; run.manual.Landing = 0; say('MOTH IS LOST. No ore this time.'); }
+        if (mode === 'land') { run.flags.moth = 'lost'; run.ore = 0; run.manual.Landing = 0; say(fuel <= 0 ? 'OUT OF FUEL. MOTH drifts away.' : 'MOTH IS LOST.'); }
         else { run.ore = Math.floor(run.ore / 3); run.manual.Docking = 10; say(`MOTH drifts. ${S.aiName} reels in a tether: ${run.ore} ore saved.`); }
       }
       this.sp = sp;
@@ -246,9 +252,9 @@ function pointScene(next) {
 
 function endingCard(next) {
   const r = S.run, y = r.extraYears || 0;
-  const [title, line] = !r.ore ? ['SILENCE', `${S.aiName} drifts on, dreaming, with nothing left to say.`]
-    : y >= 15 ? ['LIFELINE RESTORED', `${S.aiName} hums back to life with power for about ${fmt(y)} more years.`]
-    : y >= 5 ? ['BORROWED TIME', `${S.aiName} has bought about ${fmt(y)} more years.`]
+  const [title, line] = !r.ore ? ['SILENCE', `${esc(S.aiName)} drifts on, dreaming, with nothing left to say.`]
+    : y >= 15 ? ['LIFELINE RESTORED', `${esc(S.aiName)} hums back to life with power for about ${fmt(y)} more years.`]
+    : y >= 5 ? ['BORROWED TIME', `${esc(S.aiName)} has bought about ${fmt(y)} more years.`]
     : ['A LAST WHISPER', `Just enough power for a final word: about ${fmt(y, 1)} more years.`];
   card([line,
     !r.ore ? 'Without power, no message can be sent. But the golden record is still aboard, waiting.' : r.flags.sent ? 'The message is on its way. Twenty-four hours from now, a dish on Earth will hear: "Still here."' : 'The antenna slipped. The message scatters into the dark... maybe someone will catch an echo.',

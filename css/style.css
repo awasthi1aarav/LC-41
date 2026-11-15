@@ -9,7 +9,7 @@ html,body{margin:0;height:100%;background:#000;color:var(--fg);font-family:VT323
 #ui{position:absolute;inset:0;overflow:auto;pointer-events:none;text-shadow:0 0 6px var(--glow)}
 #ui .layer{pointer-events:auto}
 #ui.pass .layer{pointer-events:none}
-#ui.pass .layer button,#ui.pass .layer .clk{pointer-events:auto}
+#ui.pass .layer button,#ui.pass .layer .clk,#ui.pass .layer .box{pointer-events:auto}
 h1,h2,h3,.px{font-family:'Press Start 2P',monospace;font-weight:400;letter-spacing:.04em}
 h1{font-size:clamp(28px,6vw,72px);margin:.2em 0;color:var(--hi);text-shadow:0 0 18px var(--glow),4px 4px 0 var(--dim)}
 h2{font-size:clamp(14px,2vw,22px);color:var(--hi);margin:.4em 0 .6em}
@@ -93,3 +93,9 @@ td.n{text-align:right}
 .keys{display:flex;flex-direction:column;gap:8px;margin:14px 0;align-items:center}
 .keys div{display:flex;gap:12px;align-items:center;font-size:22px}
 .key{font-family:VT323,monospace;font-size:22px;border:2px solid var(--fg);border-bottom-width:4px;padding:6px 8px;color:var(--hi);min-width:120px;display:inline-block}
+#pad[hidden]{display:none!important}
+#menuBtn{position:fixed;right:84px;top:8px;font-size:10px;z-index:5;padding:6px 8px;opacity:.7}
+#pause{z-index:7}
+.opt:focus-visible,button:focus-visible{outline:2px dashed var(--hi);outline-offset:2px}
+#rotate{display:none;position:absolute;bottom:70px;left:0;right:0;text-align:center;font-size:20px;pointer-events:none}
+@media (orientation:portrait) and (max-width:700px){body:not(.ui-full) #rotate{display:block}}

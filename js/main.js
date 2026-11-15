@@ -14,7 +14,7 @@ function boot() {
 }
 
 function menu() {
-  setWhatif(false); pad(false);
+  setWhatif(false); pad(false); inRun(false);
   setScene({ draw(dt) { clear(); stars(10, 0, dt); voyager(W * 0.78 + Math.sin(G.t * .3) * 6, H * 0.72, 2.2, -0.2 + Math.sin(G.t * .5) * .05); } });
   const shared = location.hash.startsWith('#d=');
   ui(`<div class="center">

@@ -7,7 +7,7 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const rnd = (a, b) => a + Math.random() * (b - a);
 const fmt = (n, d = 0) => Number(n).toFixed(d);
 
-const G = { scene: null, t: 0, whatif: false };
+const G = { scene: null, t: 0, whatif: false, paused: false, speed: clamp(+(new URLSearchParams(location.search).get('speed')) || 1, 1, 8) };
 const S = { mode: 'solo', diff: 'engineer', players: [{ name: 'PLAYER 1', roles: ROLE_ORDER.slice() }],
   design: JSON.parse(JSON.stringify(REAL_DESIGN)), run: null, aiName: 'ECHO' };
 
@@ -20,6 +20,12 @@ addEventListener('keydown', e => {
   K[e.key] = true;
 });
 addEventListener('keyup', e => { K[e.key] = false; });
+addEventListener('keydown', e => {
+  const a = document.activeElement;
+  if (a && a.classList && a.classList.contains('opt') && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); a.click(); }
+  if (e.key === 'Escape' && S.run && !$('#menuBtn').hidden) togglePause();
+}, true);
+['pointerdown', 'keydown'].forEach(ev => addEventListener(ev, () => { if (AC && AC.state === 'suspended') AC.resume(); }));
 addEventListener('blur', () => { for (const k in K) K[k] = false; });
 const M = { x: W / 2, y: H / 2, down: false, clicked: false, moved: 0 };
 function toCanvas(e) {
@@ -111,7 +117,7 @@ function bar(x, y, w, h, frac, col, label) {
 
 // ---------- scenes & flow ----------
 function setScene(s) {
-  G.scene = s; s.t = 0; s.ready = !s.help; s.enter && s.enter();
+  G.sceneN = (G.sceneN || 0) + 1; G.scene = s; s.t = 0; s.ready = !s.help; s.enter && s.enter();
   const old = document.getElementById('help'); if (old) old.remove();
   if (s.help) showHelp(s);
 }
@@ -129,13 +135,35 @@ function showHelp(s) {
 }
 let last = performance.now();
 function frame(now) {
-  const dt = Math.min(0.05, (now - last) / 1000); last = now; G.t += dt;
+  let dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (G.paused) { pressed.clear(); M.clicked = false; return requestAnimationFrame(frame); }
+  dt *= G.speed; G.t += dt;
   const s = G.scene;
   if (s) { if (s.ready) { s.t += dt; s.update && s.update(dt); } s.draw && s.draw(s.ready ? dt : 0); }
   pressed.clear(); M.clicked = false;
   requestAnimationFrame(frame);
 }
-function ui(html, pass = false) { UI.innerHTML = html ? `<div class="layer">${html}</div>` : ''; UI.className = pass ? 'pass' : ''; UI.scrollTop = 0; }
+function ui(html, pass = false) {
+  UI.innerHTML = html ? `<div class="layer">${html}</div>` : ''; UI.className = pass ? 'pass' : ''; UI.scrollTop = 0;
+  document.body.classList.toggle('ui-full', !!html && !pass);
+  UI.querySelectorAll('.opt').forEach(o => { o.tabIndex = 0; o.setAttribute('role', 'button'); });
+}
+// Pause / quit during a mission
+function inRun(on) { $('#menuBtn').hidden = !on; }
+function togglePause() {
+  const open = $('#pause');
+  if (open) { open.remove(); G.paused = false; return; }
+  G.paused = true;
+  const el = document.createElement('div'); el.id = 'pause'; el.className = 'modal';
+  el.innerHTML = `<div class="box" style="text-align:center"><h2>PAUSED</h2><p><button class="big" id="pr">▶ RESUME</button></p>
+    <p><button id="prs">↺ RESTART MISSION (same design)</button></p><p><button id="pq">◀ QUIT TO MENU</button></p></div>`;
+  document.getElementById('crt').appendChild(el);
+  $('#pr').onclick = togglePause;
+  $('#prs').onclick = () => { togglePause(); abortRun(); startRun(); };
+  $('#pq').onclick = () => { togglePause(); abortRun(); menu(); };
+}
+function abortRun() { S.run = null; inRun(false); for (const k in K) K[k] = false; const h = $('#help'); if (h) h.remove(); }
+$('#menuBtn').onclick = togglePause;
 function setWhatif(on) { G.whatif = on; document.body.classList.toggle('whatif', on); }
 
 // Run a list of steps; each step is fn(next)
@@ -193,7 +221,7 @@ function card(lines, next, opts = {}) {
   const tw = $('#tw'), go = $('#go');
   tw.innerHTML = lines.map(l => `<p>${l}</p>`).join(''); go.hidden = false; go.focus();
   let done = false;
-  const k = e => { if (done) return removeEventListener('keydown', k); if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go.click(); } };
+  const k = e => { if (done || !document.body.contains(go)) return removeEventListener('keydown', k); if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go.click(); } };
   setTimeout(() => addEventListener('keydown', k), 250);
   go.onclick = () => { if (done) return; done = true; removeEventListener('keydown', k); sfx.ok(); next(); };
 }

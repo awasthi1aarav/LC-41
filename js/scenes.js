@@ -8,6 +8,7 @@ function distAU(y) {
 const lightHours = au => au * 499 / 3600;
 
 function startRun() {
+  inRun(true); setWhatif(false);
   const d = JSON.parse(JSON.stringify(S.design)), c = calc(d);
   S.run = { d, c, sci: { planet: 0, titan: 0, pbd: 0, inter: 0, whatif: 0 }, manual: {}, dataMade: 0, dataLost: 0,
     hyd: d.hyd - 30, faults: 0, flags: {}, on: Object.fromEntries(c.flown.map(i => [i.id, true])), notes: [] };
@@ -203,7 +204,7 @@ function burnScene(next) {
       if (done) return;
       const hold = K[' '] || M.down;
       if (hold && this.t > .4) { burning = true; dv += 2.6 * dt; if ((G.t * 30 | 0) % 2) beep(90, .03, 'sawtooth', .03); }
-      if ((burning && !hold) || dv >= 10) finish();
+      if ((burning && !hold) || dv >= 10 || (!burning && this.t > 20)) finish();
     },
     draw(dt) {
       const c = C(); clear(); stars(10, 0, dt);
@@ -224,7 +225,8 @@ function burnScene(next) {
     S.run.manual.Burn = q * 100;
     const miss = Math.round(6490 * (1 + err * 2));
     (err <= band ? sfx.ok : sfx.bad)();
-    setTimeout(() => card([err <= band ? '<span class="ok">Perfect burn.</span>' : `Off by ${fmt(err, 2)} m/s.`,
+    const run0 = S.run;
+    setTimeout(() => S.run === run0 && card([err <= band ? '<span class="ok">Perfect burn.</span>' : `Off by ${fmt(err, 2)} m/s.`,
       `Fuel used: ${fmt(10 + waste, 1)} kg${waste > 1 ? ` (${fmt(waste, 1)} kg wasted)` : ''}.`], next, { title: 'BURN REPORT' }), 500);
   }
 }
@@ -300,13 +302,13 @@ function longNight(next) {
   function memoryPuzzle() {
     paused = true; const bad = new Set(); while (bad.size < 4) bad.add(Math.floor(Math.random() * 12));
     const pick = new Set(); let left = 15;
-    const tm = setInterval(() => { left--; const e = $('#mt'); if (e) e.textContent = left; if (left <= 0) close(false); }, 1000);
-    const close = ok => { clearInterval(tm); $('#mod').innerHTML = ''; paused = false;
+    const tm = setInterval(() => { if (S.run !== run) return clearInterval(tm); left--; const e = $('#mt'); if (e) e.textContent = left; if (left <= 0) close(false); }, 1000);
+    const close = ok => { clearInterval(tm); if (S.run !== run) return; const md = $('#mod'); if (md) md.innerHTML = ''; paused = false;
       if (ok) { run.manual.Memory = 100; say('2024: code moved around the failed chip. Voyager 1 speaks clearly again (just like the real fix).'); sfx.ok(); }
       else { run.manual.Memory = 0; run.faults++; run.sci.inter = Math.max(0, run.sci.inter - 15); say('Code landed on a bad chip: months of garbled data lost (-15).'); sfx.bad(); } };
     const r = () => { $('#mod').innerHTML = `<div class="modal" style="pointer-events:auto"><div class="box"><h2>NOV 2023 · MEMORY FAULT</h2>
       <p>One of the computer's memory chips has failed and the data is gibberish. Move the code: pick <b>3 healthy</b> memory banks. Flickering ones are corrupted. <span class="hi" id="mt">${left}</span> s</p>
-      <div class="banks">${Array.from({ length: 12 }, (_, i) => `<button class="${bad.has(i) ? 'bad' : ''} ${pick.has(i) ? 'on' : ''}" data-b="${i}">${i.toString(16).toUpperCase()}</button>`).join('')}</div></div></div>`;
+      <div class="banks">${Array.from({ length: 12 }, (_, i) => `<button class="${bad.has(i) ? 'bad' : ''} ${pick.has(i) ? 'on' : ''}" data-b="${i}" ${pick.has(i) ? 'disabled' : ''}>${i.toString(16).toUpperCase()}</button>`).join('')}</div></div></div>`;
       UI.querySelectorAll('[data-b]').forEach(b => b.onclick = () => { const i = +b.dataset.b; if (bad.has(i)) return close(false); pick.add(i); beep(700, .03); if (pick.size >= 3) close(true); else r(); }); };
     r();
   }
@@ -317,7 +319,7 @@ function longNight(next) {
       for (let i = 1; i <= 10; i++) if (hit(String(i % 10))) toggle(i - 1);
       bannerT -= dt;
       if (paused) return;
-      const speed = (K.f || K.F ? 4 : 1) * (bannerT > 0 ? .25 : 1);
+      const speed = (K.f || K.F ? 4 : 1) * (bannerT > 0 ? .25 : 1) * (y > 2027 ? 1 + (y - 2027) / 4 : 1);
       const dy = dt * speed; y += dy;
       events.forEach(e => { if (!done.has(e) && y >= e.y + c.win.delay * 0) { done.add(e); e.f(); } });
       run.hyd -= dy * HYD_PER_YEAR;
@@ -360,7 +362,7 @@ function longNight(next) {
     const msg = { power: `The RTGs can no longer run the radio. Voyager 1 falls silent in ${Math.floor(y)}.`,
       hydrazine: `The hydrazine is gone. With no thrusters, the antenna drifts off Earth in ${Math.floor(y)}. Contact lost.`,
       frozen: `The thruster fuel lines froze. Voyager can no longer point at Earth. Contact lost in ${Math.floor(y)}.` }[why];
-    setTimeout(() => card([msg, `It travelled ${fmt(distAU(y))} AU from the Sun: ${fmt(lightHours(distAU(y)), 1)} light-hours.`,
+    setTimeout(() => S.run === run && card([msg, `It travelled ${fmt(distAU(y))} AU from the Sun: ${fmt(lightHours(distAU(y)), 1)} light-hours.`,
       'In our timeline, this is where the story would end.', '<span class="fiction">But not in every timeline.</span>'], next, { title: 'LAST SIGNAL', btn: '. . .' }), 600);
   }
 }
