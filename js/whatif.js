@@ -35,7 +35,7 @@ function glitch(next) {
       for (let i = 0; i < 18; i++) rect(0, rnd(0, H), W, rnd(1, 6), Math.random() < .5 ? c.dim : c.bg);
       const i = Math.min(lines.length - 1, Math.floor(this.t / 1.1));
       const o = rnd(-3, 3);
-      txt(lines[i], W / 2 + o, H / 2, '#ff2050', 22, 'center', 'px'); txt(lines[i], W / 2 - o, H / 2, '#20f0ff', 22, 'center', 'px'); txt(lines[i], W / 2, H / 2, c.hi, 22, 'center', 'px');
+      const fs = Math.min(22, 440 / lines[i].length); txt(lines[i], W / 2 + o, H / 2, '#ff2050', fs, 'center', 'px'); txt(lines[i], W / 2 - o, H / 2, '#20f0ff', fs, 'center', 'px'); txt(lines[i], W / 2, H / 2, c.hi, fs, 'center', 'px');
     }
   });
 }
