@@ -20,7 +20,8 @@ function startRun() {
   if (c.win.saturn) {
     steps.push(n => timeSkip(1979.2 + dl * 1.2, 1980.4 + dl * 2, 'CRUISE TO SATURN', n));
     steps.push(n => station('engineer', 'TRAJECTORY CORRECTION. Hold SPACE (or the ACTION button) to fire the thrusters, and let go inside the green band. Every wasted second burns hydrazine you\'ll need for decades.', n));
-    steps.push(n => burnScene(n));
+    steps.push(n => withRetry('burn', burnScene, () => S.run.manual.Burn < 40,
+      { title: 'BAD BURN', msg: 'The burn missed badly. Voyager is off course for Saturn.', label: 'Fire a second correction burn (uses more fuel)' }, n));
     if (c.win.titan) steps.push(n => vote('TITAN OR PLUTO?', 'Real history: in 1980 the team chose Titan, Saturn\'s moon with a thick hazy atmosphere. A close Titan pass bends Voyager 1 up and out of the plane of the planets for good.', [
       { name: 'TITAN (the real choice)', desc: 'Big science now: Titan\'s atmosphere. Best with infrared and UV spectrometers aboard.' },
       { name: 'PLUTO (what-if)', desc: 'Skip Titan and aim for a Pluto flyby years later. Costs 8 kg of extra hydrazine and gambles on the spacecraft surviving that long.' }],
@@ -29,13 +30,17 @@ function startRun() {
   }
   steps.push(n => timeSkip(1981 + dl * 2, 1990.1, 'THE LONG CRUISE', n));
   steps.push(n => has('ISS') ? station('science', '14 FEBRUARY 1990, 6 billion km from home. Carl Sagan has asked for one last photo: turn the cameras back towards the Sun and find Earth. Drag or use arrows to pan; SPACE to shoot. You have 8 frames.', n) : n());
-  steps.push(n => has('ISS') ? pbdScene(n) : card(['No cameras aboard, so there is no Pale Blue Dot in this timeline.', 'The fields-and-particles instruments keep listening to the solar wind.'], n, { title: 'FEB 1990' }));
+  steps.push(n => has('ISS') ? withRetry('pbd', pbdScene, () => !S.run.flags.pbd, { title: 'EARTH NOT FOUND', msg: 'No photo of Earth this time.', label: 'Take 8 more frames' }, n) : card(['No cameras aboard, so there is no Pale Blue Dot in this timeline.', 'The fields-and-particles instruments keep listening to the solar wind.'], n, { title: 'FEB 1990' }));
   steps.push(n => has('ISS') ? vote('SWITCH THE CAMERAS OFF?', 'Real history: after the Pale Blue Dot, NASA turned Voyager 1\'s cameras off for good to save power and memory. They were never needed again.', [
     { name: 'CAMERAS OFF (real)', desc: `Saves ${INSTBY.ISS.power} W for the instruments that work in deep space.` },
     { name: 'KEEP THEM ON', desc: 'There is nothing left to photograph out there, but you could keep the option. You pay in watts every year.' }],
     pick => { if (!pick) { S.run.on.ISS = false; S.run.flags.camOff = true; } n(); }) : n());
   steps.push(n => station('engineer', 'THE LONG NIGHT, 1990 onwards. The RTGs fade every year. Keep power draw below supply by switching loads off (click, or keys 1-9). Never let the thruster line heaters freeze. Hold F to fast-forward.', n));
-  steps.push(n => longNight(n));
+  steps.push(n => withRetry('night', longNight, () => S.run.silence < 2026.88,
+    { title: 'CONTACT LOST EARLY', msg: 'Voyager went silent before reaching one light-day. In real life, fault protection would drop it into SAFE MODE so engineers could try again.',
+      label: 'SAFE MODE: rewind to 1990 and try again',
+      snapshot: () => JSON.stringify({ hyd: S.run.hyd, faults: S.run.faults, inter: S.run.sci.inter, on: S.run.on }),
+      restore: j => { const o = JSON.parse(j); S.run.hyd = o.hyd; S.run.faults = o.faults; S.run.sci.inter = o.inter; S.run.on = o.on; } }, n));
   sequence(steps, () => whatifAct());
 }
 

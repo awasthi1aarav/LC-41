@@ -197,4 +197,24 @@ function card(lines, next, opts = {}) {
   setTimeout(() => addEventListener('keydown', k), 250);
   go.onclick = () => { if (done) return; done = true; removeEventListener('keydown', k); sfx.ok(); next(); };
 }
+// ---------- failsafes ----------
+// Play a mini-game; if it fails, offer ONE failsafe retry (costs 50 points) or accept and carry on.
+function withRetry(key, play, failed, info, next) {
+  const r = S.run; r.retried = r.retried || {}; r.penalty = r.penalty || 0;
+  const snap = info.snapshot ? info.snapshot() : null;
+  const attempt = () => play(() => {
+    if (!failed() || r.retried[key]) return next();
+    failsafe(info, () => { r.retried[key] = true; r.penalty += 50; if (info.restore) info.restore(snap); attempt(); }, next);
+  });
+  attempt();
+}
+function failsafe(info, retry, accept) {
+  setScene({ draw() { clear(); stars(2, 0, 1 / 60); if ((G.t * 2 | 0) % 2) rect(0, 0, W, 3, C().bad); } });
+  sfx.bad();
+  ui(`<div class="center"><div class="box" style="max-width:640px"><p class="px bad" style="font-size:10px">⚠ MISSION ANOMALY</p><h2>${info.title}</h2><p>${typeof info.msg === "function" ? info.msg() : info.msg}</p>
+    <p style="margin-top:14px"><button class="big" id="fs">🛟 FAILSAFE: ${info.label}</button></p><p class="muted">One use only · costs 50 points</p>
+    <p><button id="acc">ACCEPT AND CONTINUE ▶</button></p></div></div>`);
+  $('#fs').onclick = () => { sfx.ok(); retry(); };
+  $('#acc').onclick = () => accept();
+}
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));

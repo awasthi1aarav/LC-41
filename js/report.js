@@ -19,9 +19,10 @@ function score() {
     capcom: r.dataMade > 0 && r.dataLost / r.dataMade <= .1,
   };
   const team = Object.values(goals).filter(Boolean).length * 40;
-  const total = design + science + longevity + manual + team;
+  const penalty = r.penalty || 0;
+  const total = design + science + longevity + manual + team - penalty;
   const rank = total < 400 ? 'TRAINEE' : total < 700 ? 'FLIGHT CONTROLLER' : total < 1000 ? 'MISSION ENGINEER' : total < 1300 ? 'FLIGHT DIRECTOR' : 'GRAND TOUR LEGEND';
-  return { design, science, longevity, manual, team, total, rank, goals, reserve };
+  return { design, science, longevity, manual, team, penalty, total, rank, goals, reserve };
 }
 
 function analysis(s) {
@@ -52,7 +53,7 @@ function report() {
   setWhatif(false); pad(false);
   const s = score(), r = S.run, [la, ld] = lookalike();
   setScene({ draw(dt) { clear(); stars(4, 0, dt); } });
-  const rows = [['Mission design', s.design], ['Science', s.science], ['Longevity', s.longevity], ['Manual piloting', s.manual], ['Team goals', s.team]];
+  const rows = [['Mission design', s.design], ['Science', s.science], ['Longevity', s.longevity], ['Manual piloting', s.manual], ['Team goals', s.team], ['Failsafes used', s.penalty ? -s.penalty : 0]];
   ui(`<div class="center"><div class="box" style="max-width:940px;text-align:left">
     <p class="px muted" style="font-size:10px">MISSION REPORT · LC-41 · ${S.mode === 'crew' ? 'CREW OF ' + S.players.length : 'SOLO'} · ${DIFF[S.diff].name}</p>
     <h1 style="font-size:clamp(20px,4vw,40px)">${s.total} PTS</h1><h2>RANK: ${s.rank}</h2>

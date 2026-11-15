@@ -10,14 +10,16 @@ function whatifAct() {
     n => station('capcom', 'SCAN. Ping the sectors around you to find the asteroid. The return tells you how close each ping was. Fewer pings = more drone fuel.', n),
     n => scanScene(n),
     n => station('director', 'FLY MOTH. Arrow keys (or the pad) fire its thrusters. Land gently on the asteroid: slower than 18 px/s or you\'ll damage it.', n),
-    n => droneScene('land', n),
+    n => withRetry('land', r => droneScene('land', r), () => S.run.flags.moth === 'lost',
+      { title: 'MOTH LOST', msg: 'The drone is gone, and so is the ore.', label: 'Launch backup drone MOTH-B (70% fuel)',
+        restore: () => { S.run.flags.moth = undefined; S.run.mothFuel = 70; } }, n),
     n => S.run.flags.moth === 'lost' ? n() : station('engineer', 'DRILL. Press SPACE when the cursor is in the green zone to cut ore free. Misses heat the drill. If it overheats, it jams.', n),
-    n => S.run.flags.moth === 'lost' ? n() : drillScene(n),
+    n => S.run.flags.moth === 'lost' ? n() : withRetry('drill', drillScene, () => S.run.flags.jam && S.run.ore < 4, { title: 'DRILL JAMMED', msg: () => `Only ${S.run.ore} ore before the drill overheated.`, label: 'Let it cool and drill again' }, n),
     n => S.run.flags.moth === 'lost' ? n() : station('capcom', `DOCK. Bring MOTH home with ${S.run.ore} ore. Touch the docking port (the bright square on ${esc(S.aiName)}) slower than 12 px/s.`, n),
-    n => S.run.flags.moth === 'lost' ? n() : droneScene('dock', n),
+    n => S.run.flags.moth === 'lost' ? n() : withRetry('dock', r => droneScene('dock', r), () => (S.run.manual.Docking || 0) <= 10, { title: 'DOCKING FAILED', msg: 'MOTH missed the port and most of the ore drifted away.', label: 'Chase it down and try again', snapshot: () => S.run.ore, restore: o => { S.run.ore = o; } }, n),
     n => restoreScreen(n),
     n => !S.run.ore ? n() : station('capcom', 'THE LAST TASK. Hand-point the antenna at Earth, a dot one light-day away, and hold it steady to send everything home. The spacecraft drifts; correct it.', n),
-    n => !S.run.ore ? n() : pointScene(n),
+    n => !S.run.ore ? n() : withRetry('point', pointScene, () => !S.run.flags.sent, { title: 'SIGNAL LOST', msg: 'The antenna slipped off Earth before the message finished.', label: 'Re-acquire Earth' }, n),
   ], () => endingCard(() => report()));
 }
 
@@ -155,7 +157,7 @@ function droneScene(mode, next) {
 
 // ---------- drill ----------
 function drillScene(next) {
-  const run = S.run; run.ore = 0;
+  const run = S.run; run.ore = 0; run.flags.jam = false;
   let pos = 0, dir = 1, heat = 0, zone = .22, center = rnd(.3, .7), jam = false, endAt = 0, flash = 0;
   ui(''); pad(true);
   setScene({
@@ -169,7 +171,7 @@ function drillScene(next) {
         if (Math.abs(pos - center) < zone / 2) { run.ore++; heat += 14; flash = .15; sfx.ok(); zone = Math.max(.08, zone * .88); center = rnd(.15, .85); }
         else { heat += 30; sfx.bad(); }
       }
-      if (heat >= 100) { jam = true; endAt = this.t + 2; sfx.bad(); }
+      if (heat >= 100) { jam = true; run.flags.jam = true; endAt = this.t + 2; sfx.bad(); }
       if (run.ore >= 8 || this.t > 25) endAt = this.t + 1.5;
     },
     draw(dt) {
