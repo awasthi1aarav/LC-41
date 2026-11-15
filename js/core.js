@@ -117,7 +117,7 @@ function bar(x, y, w, h, frac, col, label) {
 
 // ---------- scenes & flow ----------
 function setScene(s) {
-  G.sceneN = (G.sceneN || 0) + 1; G.scene = s; s.t = 0; s.ready = !s.help; s.enter && s.enter();
+  G.sceneN = (G.sceneN || 0) + 1; fxClear(); G.scene = s; s.t = 0; s.ready = !s.help; s.enter && s.enter();
   const old = document.getElementById('help'); if (old) old.remove();
   if (s.help) showHelp(s);
 }
@@ -139,7 +139,11 @@ function frame(now) {
   if (G.paused) { pressed.clear(); M.clicked = false; return requestAnimationFrame(frame); }
   dt *= G.speed; G.t += dt;
   const s = G.scene;
-  if (s) { if (s.ready) { s.t += dt; s.update && s.update(dt); } s.draw && s.draw(s.ready ? dt : 0); }
+  if (s) {
+    if (s.ready) { s.t += dt; s.update && s.update(dt); }
+    ctx.save(); if (FX.shake > 0) ctx.translate(rnd(-FX.shake, FX.shake) | 0, rnd(-FX.shake, FX.shake) | 0);
+    s.draw && s.draw(s.ready ? dt : 0); fxDraw(s.ready ? dt : 0); ctx.restore();
+  }
   pressed.clear(); M.clicked = false;
   requestAnimationFrame(frame);
 }
@@ -162,7 +166,7 @@ function togglePause() {
   $('#prs').onclick = () => { togglePause(); abortRun(); startRun(); };
   $('#pq').onclick = () => { togglePause(); abortRun(); menu(); };
 }
-function abortRun() { S.run = null; inRun(false); for (const k in K) K[k] = false; const h = $('#help'); if (h) h.remove(); }
+function abortRun() { S.run = null; const em = $('#emerg'); if (em) em.remove(); inRun(false); for (const k in K) K[k] = false; const h = $('#help'); if (h) h.remove(); }
 $('#menuBtn').onclick = togglePause;
 function setWhatif(on) { G.whatif = on; document.body.classList.toggle('whatif', on); }
 

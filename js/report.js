@@ -11,6 +11,7 @@ function score() {
   let life = (r.silence - c.launchYear) * 4 + (r.extraYears || 0) * 6;
   if (obj === 'far') life *= 1.5;
   const longevity = Math.round(life);
+  if (r.emerg) r.manual.Emergencies = r.emerg.ok / Math.max(1, r.emerg.ok + r.emerg.fail) * 100;
   const mv = Object.values(r.manual), manual = Math.round(mv.length ? mv.reduce((a, b) => a + b, 0) / mv.length * 2 : 0);
   const goals = {
     director: !diff.sandbox && reserve >= 20,
@@ -50,7 +51,7 @@ function lookalike() {
 }
 
 function report() {
-  setWhatif(false); pad(false); inRun(false);
+  setWhatif(false); pad(false); inRun(false); music('menu');
   const s = score(), r = S.run, [la, ld] = lookalike();
   setScene({ draw(dt) { clear(); stars(4, 0, dt); } });
   const rows = [['Mission design', s.design], ['Science', s.science], ['Longevity', s.longevity], ['Manual piloting', s.manual], ['Team goals', s.team], ['Failsafes used', s.penalty ? -s.penalty : 0]];
@@ -59,6 +60,8 @@ function report() {
     <h1 style="font-size:clamp(20px,4vw,40px)">${s.total} PTS</h1><h2>RANK: ${s.rank}</h2>
     <div class="two"><div>
       <table>${rows.map(([a, b]) => `<tr><td>${a}</td><td class="n">${b}</td></tr>`).join('')}<tr><th>TOTAL</th><th class="n">${s.total}</th></tr></table>
+      <h3 style="margin-top:12px">MINI-GAMES</h3>${Object.entries(r.stars || {}).map(([k, n]) => `<p>${k}: <span style="color:#ffe14d">${'★'.repeat(n)}</span><span class="muted">${'★'.repeat(3 - n)}</span></p>`).join('')}
+      ${r.emerg ? `<p>Emergencies: <span class="ok">${r.emerg.ok} saved</span>, <span class="bad">${r.emerg.fail} missed</span></p>` : ''}
       <h3 style="margin-top:12px">TEAM GOALS</h3>
       ${ROLE_ORDER.map(k => `<p class="${s.goals[k] ? 'ok' : 'bad'}">${s.goals[k] ? '✓' : '✗'} ${ROLES[k].name}${S.mode === 'crew' ? ` (${esc(nameFor(k))})` : ''}: ${ROLES[k].goal}</p>`).join('')}
       <h3 style="margin-top:12px">YOUR SPACECRAFT RESEMBLES</h3><p class="hi">${la}</p><p>${ld}</p>

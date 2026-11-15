@@ -8,7 +8,7 @@ function distAU(y) {
 const lightHours = au => au * 499 / 3600;
 
 function startRun() {
-  inRun(true); setWhatif(false);
+  inRun(true); setWhatif(false); music('action');
   const d = JSON.parse(JSON.stringify(S.design)), c = calc(d);
   S.run = { d, c, sci: { planet: 0, titan: 0, pbd: 0, inter: 0, whatif: 0 }, manual: {}, dataMade: 0, dataLost: 0,
     hyd: d.hyd - 30, faults: 0, flags: {}, on: Object.fromEntries(c.flown.map(i => [i.id, true])), notes: [] };
@@ -20,6 +20,7 @@ function startRun() {
   steps.push(n => imaging(JUPITER, n));
   if (c.win.saturn) {
     steps.push(n => timeSkip(1979.2 + dl * 1.2, 1980.4 + dl * 2, 'CRUISE TO SATURN', n));
+    steps.push(n => emergency(() => n()));
     steps.push(n => station('engineer', 'TRAJECTORY CORRECTION. Hold SPACE (or the ACTION button) to fire the thrusters, and let go inside the green band. Every wasted second burns hydrazine you\'ll need for decades.', n));
     steps.push(n => withRetry('burn', burnScene, () => S.run.manual.Burn < 40,
       { title: 'BAD BURN', msg: 'The burn missed badly. Voyager is off course for Saturn.', label: 'Fire a second correction burn (uses more fuel)' }, n));
@@ -30,6 +31,7 @@ function startRun() {
     steps.push(n => imaging(SATURN(), n));
   }
   steps.push(n => timeSkip(1981 + dl * 2, 1990.1, 'THE LONG CRUISE', n));
+  steps.push(n => emergency(() => n()));
   steps.push(n => has('ISS') ? station('science', '14 FEBRUARY 1990, 6 billion km from home. Carl Sagan has asked for one last photo: turn the cameras back towards the Sun and find Earth. Drag or use arrows to pan; SPACE to shoot. You have 8 frames.', n) : n());
   steps.push(n => has('ISS') ? withRetry('pbd', pbdScene, () => !S.run.flags.pbd, { title: 'EARTH NOT FOUND', msg: 'No photo of Earth this time.', label: 'Take 8 more frames' }, n) : card(['No cameras aboard, so there is no Pale Blue Dot in this timeline.', 'The fields-and-particles instruments keep listening to the solar wind.'], n, { title: 'FEB 1990' }));
   steps.push(n => has('ISS') ? vote('SWITCH THE CAMERAS OFF?', 'Real history: after the Pale Blue Dot, NASA turned Voyager 1\'s cameras off for good to save power and memory. They were never needed again.', [
@@ -114,7 +116,7 @@ function imaging(P, next) {
   const run = S.run, c = run.c, cam = !!run.on.ISS;
   const auto = run.c.flown.filter(i => i.id !== 'ISS' && run.on[i.id]);
   const autoData = Math.max(0, c.demand - (cam ? 30 : 0)), autoSci = auto.reduce((a, i) => a + i.p, 0);
-  let made = 0, lost = 0, got = new Set(), msg = '', msgT = 0, rx = W / 2, ry = H / 2, flash = 0;
+  let made = 0, lost = 0, got = new Set(), msg = '', msgT = 0, rx = W / 2, ry = H / 2, flash = 0, combo = 0, bolt = null, boltNext = 4, bolts = 0;
   const say = m => { msg = m; msgT = 2.2; };
   ui(`<div class="hud"><span id="h1"></span><span id="h2"></span></div>`, true); pad(cam);
   const dur = cam ? P.dur : 9;
@@ -139,9 +141,13 @@ function imaging(P, next) {
         let best = null, bd = 1e9, br = 4;
         P.targets.forEach(tg => { if (got.has(tg.n)) return; const p = pos(tg, t); if (!p.vis) return; const dd = Math.hypot(p.x - rx, p.y - ry); if (dd < 12 + p.r && dd < bd) { bd = dd; best = tg; br = p.r; } });
         const cost = best ? 8 : 2;
-        if (made + cost > c.dataCap) { lost += cost; made += cost; say(best ? `BUFFER FULL · ${best.n} image lost` : 'BUFFER FULL'); if (best) sfx.bad(); return; }
+        if (made + cost > c.dataCap) { lost += cost; made += cost; say(best ? `BUFFER FULL · ${best.n} image lost` : 'BUFFER FULL'); if (best) sfx.bad(); shake(3); combo = 0; return; }
         made += cost;
-        if (!best) return say('Nothing in frame · data wasted');
+        if (bolt && !best && Math.hypot(bolt.x - rx, bolt.y - ry) < 14) {
+          bolt = null; bolts++; run.sci.planet += 15; combo++; pop(rx, ry - 14, 'LIGHTNING! +15', '#fff27a', 10); burst(rx, ry, '#fff27a', 24, 90); jingle([84, 88, 91]);
+          say('Lightning on Jupiter\'s night side (Voyager 1 really saw this)'); return;
+        }
+        if (!best) { combo = 0; pop(rx, ry - 14, 'MISS', C().bad, 9); return say('Nothing in frame · data wasted'); }
         const q = clamp(1.2 - bd / (12 + br), .4, 1);
         got.add(best.n);
         let sci = best.v * q * (1 + (run.on.PPS ? .1 : 0));
@@ -151,7 +157,14 @@ function imaging(P, next) {
           run.sci.titan += ts * (run.flags.burnQ || 1);
           say(run.on.IRIS || run.on.UVS ? 'TITAN: haze hides the surface, but your spectrometers read its thick nitrogen air' : 'TITAN: just orange haze. No IR/UV spectrometer to read its air.');
         } else say(`${best.n.toUpperCase()} imaged · quality ${fmt(q * 100)}%`);
+        combo++; const mult = Math.min(2, 1 + .25 * (combo - 1)); sci *= mult;
+        const bp = pos(best, t); burst(bp.x, bp.y, C().hi, 20, 80); pop(bp.x, bp.y - 16, `+${Math.round(sci)}`, C().ok, 10);
+        if (combo >= 2) { pop(bp.x, bp.y - 30, `COMBO x${combo}`, '#ffe14d', 9); if (combo === 3) chat(pick(LINES.combo)); }
         run.sci.planet += sci; sfx.ok();
+      }
+      if (P.name === 'JUPITER' && cam) {
+        if (bolt && t > bolt.until) bolt = null;
+        if (!bolt && t > boltNext) { const f = t / dur, px = W * (0.78 - 0.5 * f); bolt = { x: px - P.pr * rnd(.45, .7), y: H * 0.52 + rnd(-25, 25), until: t + 1.5 }; boltNext = t + rnd(4, 7); }
       }
       if (t > dur) end();
     },
@@ -170,7 +183,10 @@ function imaging(P, next) {
         if (cam && !got.has(tg.n) && DIFF[S.diff].hint) txt(tg.n, p.x, p.y - p.r - 7, col.dim, 12, 'center');
         if (got.has(tg.n)) txt('✓', p.x + p.r + 4, p.y - p.r - 2, col.ok, 14);
       });
+      if (P.name === 'JUPITER') { ctx.fillStyle = 'rgba(0,0,0,.45)'; ctx.beginPath(); ctx.arc(px, py, pr, Math.PI / 2, Math.PI * 1.5); ctx.fill(); }
+      if (bolt) { const fl = (G.t * 20 | 0) % 3; if (fl) { rect(bolt.x - 1, bolt.y - 6, 2, 5, '#fff27a'); rect(bolt.x, bolt.y - 1, 2, 5, '#fff27a'); disc(bolt.x, bolt.y, 4, 'rgba(255,240,120,.35)'); } if (DIFF[S.diff].hint) txt('lightning!', bolt.x, bolt.y - 12, '#fff27a', 12, 'center'); }
       if (cam) reticle(rx, ry, 9, col.hi);
+      if (combo >= 2) txt(`COMBO x${combo}`, 60, H - 14, '#ffe14d', 10, 'left', 'px');
       if (flash > 0) { ctx.fillStyle = 'rgba(255,255,255,.25)'; ctx.fillRect(0, 0, W, H); }
       voyager(30, 30, 1);
       txt(cam ? `${P.name} FLYBY · ${got.size}/${P.targets.length} targets · ${Math.max(0, dur - t).toFixed(0)} s` : `${P.name} · no cameras aboard: fields & particles sample the magnetosphere`, W / 2, 14, col.hi, 16, 'center');
@@ -186,10 +202,9 @@ function imaging(P, next) {
     const keep = autoData ? clamp(1 - over / autoData, 0, 1) : 1;
     run.dataMade += totalMade; run.dataLost += lost + over;
     run.sci.planet += autoSci * keep * 0.8;
-    run.manual[P.name] = cam ? got.size / P.targets.length * 100 : 50;
+    run.manual[P.name] = cam ? Math.min(100, got.size / P.targets.length * 100 + bolts * 10) : 50;
     pad(false);
-    card([`${got.size} of ${P.targets.length} targets photographed.`,
-      lost + over ? `<span class="bad">${fmt(lost + over)} data units lost</span>: a bigger dish or a tape recorder would help.` : '<span class="ok">All data reached Earth.</span>'], next, { title: `${P.name}: DONE` });
+    starsThen(P.name, run.manual[P.name], `${got.size}/${P.targets.length} targets${bolts ? ` + ${bolts} lightning` : ''} · ${lost + over ? fmt(lost + over) + ' data lost' : 'no data lost'}`, next);
   }
 }
 
@@ -203,7 +218,7 @@ function burnScene(next) {
     update(dt) {
       if (done) return;
       const hold = K[' '] || M.down;
-      if (hold && this.t > .4) { burning = true; dv += 2.6 * dt; if ((G.t * 30 | 0) % 2) beep(90, .03, 'sawtooth', .03); }
+      if (hold && this.t > .4) { burning = true; dv += 2.6 * dt; shake(1.2); if (Math.random() < .5) burst(122, 135, C().acc, 2, 40); if ((G.t * 30 | 0) % 2) beep(90, .03, 'sawtooth', .03); }
       if ((burning && !hold) || dv >= 10 || (!burning && this.t > 20)) finish();
     },
     draw(dt) {
@@ -226,8 +241,7 @@ function burnScene(next) {
     const miss = Math.round(6490 * (1 + err * 2));
     (err <= band ? sfx.ok : sfx.bad)();
     const run0 = S.run;
-    setTimeout(() => S.run === run0 && card([err <= band ? '<span class="ok">Perfect burn.</span>' : `Off by ${fmt(err, 2)} m/s.`,
-      `Fuel used: ${fmt(10 + waste, 1)} kg${waste > 1 ? ` (${fmt(waste, 1)} kg wasted)` : ''}.`], next, { title: 'BURN REPORT' }), 500);
+    setTimeout(() => S.run === run0 && starsThen('ENGINE BURN', S.run.manual.Burn, err <= band ? `Right in the window · ${fmt(10 + waste, 1)} kg fuel` : `Off by ${fmt(err, 2)} m/s · ${fmt(waste, 1)} kg fuel wasted`, next), 500);
   }
 }
 
@@ -248,11 +262,11 @@ function pbdScene(next) {
       if (this.t > .4 && (hit(' ') || hit('Enter')) && frames > 0 && !found) {
         frames--; flash = .15; sfx.snap();
         const ex = earth.x - cx, ey = earth.y - cy;
-        if (Math.hypot(ex - W / 2, ey - H / 2) < 14) { found = true; S.run.flags.pbd = true; S.run.sci.pbd = 40 + frames * 3; sfx.ok(); msg = 'THERE. A mote of dust in a sunbeam: every human who ever lived.'; msgT = 4; this.endAt = this.t + 4; }
+        if (Math.hypot(ex - W / 2, ey - H / 2) < 14) { burst(W / 2, H / 2, '#9fd8ff', 40, 100); jingle([72, 79, 84, 91], .12, 'triangle'); found = true; S.run.flags.pbd = true; S.run.sci.pbd = 40 + frames * 3; sfx.ok(); msg = 'THERE. A mote of dust in a sunbeam: every human who ever lived.'; msgT = 4; this.endAt = this.t + 4; }
         else { msg = frames ? `Frame ${8 - frames}: no Earth. ${Math.hypot(ex - W / 2, ey - H / 2) < 80 ? 'Close...' : 'Look nearer the Sun.'}` : 'Out of frames.'; msgT = 2; if (!frames) this.endAt = this.t + 2; }
       }
       if (this.t > 45 && !this.endAt) this.endAt = this.t;
-      if (this.endAt && this.t > this.endAt) { this.update = null; S.run.manual.PaleBlueDot = found ? 100 : 20; pad(false); next(); }
+      if (this.endAt && this.t > this.endAt) { this.update = null; S.run.manual.PaleBlueDot = found ? 60 + frames * 6 : 10; pad(false); starsThen('PALE BLUE DOT', S.run.manual.PaleBlueDot, found ? `Found with ${frames} frames to spare` : 'Earth stayed hidden', next); }
     },
     draw() {
       const c = C(); ctx.fillStyle = '#050403'; ctx.fillRect(0, 0, W, H);
@@ -273,6 +287,7 @@ function pbdScene(next) {
 
 // ---------- the long night: power management 1990 -> silence ----------
 function longNight(next) {
+  music('menu');
   const run = S.run, d = run.d, c = run.c, core = c.bus.essential - LINE_HEATERS;
   const loads = [
     ...c.flown.map(i => ({ id: i.id, name: i.name, w: i.power, on: !!run.on[i.id], sci: i.i })),
@@ -282,6 +297,8 @@ function longNight(next) {
   let y = 1990.2, drop = 0, banner = '', bannerT = 0, lineOff = 0, ended = false, hist = [], paused = false;
   const done = new Set();
   const events = [
+    { y: 1994.5, f: () => { paused = true; emergency(() => { paused = false; }); } },
+    { y: 2017.3, f: () => { paused = true; emergency(() => { paused = false; }); } },
     { y: 1998.13, f: () => say('17 FEB 1998: Voyager 1 passes Pioneer 10. It is now the most distant human-made object.') },
     { y: 2004.96, f: () => { const n = ['PLS', 'LECP', 'CRS', 'MAG'].filter(on).length; run.sci.inter += n * 15; say(`DEC 2004: TERMINATION SHOCK. The solar wind slows suddenly. ${n} of your particle/field instruments recorded it (+${n * 15}).`); } },
     { y: 2012.65, f: () => { const n = ['PWS', 'MAG', 'CRS', 'LECP'].filter(on).length; run.sci.inter += n * 20; say(`25 AUG 2012: HELIOPAUSE. Voyager 1 enters interstellar space. ${n} instruments caught the moment (+${n * 20}).`); } },
@@ -291,7 +308,7 @@ function longNight(next) {
   const on = id => loads.some(l => l.id === id && l.on);
   const say = m => { banner = m; bannerT = 4.5; beep(520, .1, 'triangle'); };
   const draw = () => core + loads.reduce((a, l) => a + (l.on ? l.w : 0), 0);
-  const supply = () => supplyAt(d, y) - drop;
+  const supply = () => supplyAt(d, y) - drop - (run.damageW || 0);
   const toggle = i => { const l = loads[i]; if (!l || ended) return; l.on = !l.on; beep(l.on ? 800 : 300, .04); renderLoads(); };
   const renderLoads = () => {
     $('#ld').innerHTML = loads.map((l, i) => `<div class="opt ${l.on ? 'on' : ''}" data-l="${i}">${i < 9 ? `[${i + 1}] ` : i === 9 ? '[0] ' : ''}${l.id === 'LINE' ? '<span class="bad">' + l.name + '</span>' : l.name} <span style="float:right">${l.w} W</span></div>`).join('');
@@ -328,7 +345,7 @@ function longNight(next) {
       lineOff = line.on ? 0 : lineOff + dy;
       if (draw() > supply()) {
         const cand = loads.filter(l => l.on && !l.line).sort((a, b) => b.w - a.w)[0] || line;
-        cand.on = false; run.faults++; sfx.bad();
+        cand.on = false; run.faults++; sfx.bad(); shake(4);
         say(`UNDERVOLTAGE! Fault protection switched off ${cand.name}.`); renderLoads();
       }
       if (lineOff > .6) return finish('frozen');
@@ -362,7 +379,7 @@ function longNight(next) {
     const msg = { power: `The RTGs can no longer run the radio. Voyager 1 falls silent in ${Math.floor(y)}.`,
       hydrazine: `The hydrazine is gone. With no thrusters, the antenna drifts off Earth in ${Math.floor(y)}. Contact lost.`,
       frozen: `The thruster fuel lines froze. Voyager can no longer point at Earth. Contact lost in ${Math.floor(y)}.` }[why];
-    setTimeout(() => S.run === run && card([msg, `It travelled ${fmt(distAU(y))} AU from the Sun: ${fmt(lightHours(distAU(y)), 1)} light-hours.`,
-      'In our timeline, this is where the story would end.', '<span class="fiction">But not in every timeline.</span>'], next, { title: 'LAST SIGNAL', btn: '. . .' }), 600);
+    setTimeout(() => S.run === run && starsThen('THE LONG NIGHT', run.manual.LongNight, `${run.faults} power fault${run.faults === 1 ? '' : 's'} · silent in ${Math.floor(y)}`, () => card([msg, `It travelled ${fmt(distAU(y))} AU from the Sun: ${fmt(lightHours(distAU(y)), 1)} light-hours.`,
+      'In our timeline, this is where the story would end.', '<span class="fiction">But not in every timeline.</span>'], next, { title: 'LAST SIGNAL', btn: '. . .' })), 600);
   }
 }

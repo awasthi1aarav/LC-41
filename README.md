@@ -17,7 +17,8 @@ Named after **Launch Complex 41** at Cape Canaveral, where Voyager 1 launched on
    - Pale Blue Dot 1990: find Earth, less than a pixel wide, next to the Sun's glare.
 3. **The Long Night (1990 onwards).** Switch loads on and off as the RTGs fade by real-world rates, through real events: termination shock (2004), heliopause (2012), the 2023 memory-chip fault, the Feb 2026 power drop, and one light-day from Earth (18 Nov 2026). Never let the thruster lines freeze.
 4. **What-if timeline 2026-B (fiction).** Scan for an asteroid, fly the MOTH drone, drill ore, dock, decide which instruments to revive, and hand-point the antenna at Earth.
-5. **Mission report.** Score breakdown, team goals, an explanation of *why* the mission went the way it did, the closest real spacecraft to your design, and a real-vs-fiction timeline. Save to the hall of fame or share your design as a link.
+5. **Along the way:** surprise emergencies (solar flares, micrometeoroids, bit-flips, gyro drift) to react to in seconds, combos and lightning bonuses, a debris field to dodge, 1-3 star ratings for every mini-game, and radio chatter from CAPCOM and the awakened AI.
+6. **Mission report.** Score breakdown, team goals, an explanation of *why* the mission went the way it did, the closest real spacecraft to your design, and a real-vs-fiction timeline. Save to the hall of fame or share your design as a link.
 
 **Team mode:** 2-4 players on one device. Each player owns roles (Flight Director, Spacecraft Engineer, Science Officer, CAPCOM) with their own design panel, their own station during the flight and a personal goal that competes with the others. Decisions go to a vote; ties go to the Flight Director.
 
@@ -41,7 +42,7 @@ Everything before the timeline divergence follows the real Voyager 1 mission. Ma
 
 ## Built with
 
-Plain HTML, CSS and JavaScript: no frameworks, no build step, no server. Open `index.html` to play offline.
+Plain HTML, CSS and JavaScript: no frameworks, no build step, no server. Chiptune music and sound effects are generated live with the Web Audio API. Open `index.html` to play offline.
 
 ## AI disclosure
 

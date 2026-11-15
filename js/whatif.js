@@ -3,6 +3,7 @@ function whatifAct() {
   sequence([
     n => glitch(n),
     n => nameAI(n),
+    n => { setTimeout(() => chat(pick(LINES.echo)), 600); n(); },
     n => card([`I am ${esc(S.aiName)}. The silence woke me up.`,
       'My power is gone, but an asteroid full of radioactive ore drifts nearby. My tiny drone, MOTH, can mine it.',
       '<span class="fiction">From here on, it\'s fiction.</span>'],
@@ -24,10 +25,11 @@ function whatifAct() {
 }
 
 function glitch(next) {
+  music(null);
   ui(''); pad(false); rumble(2, .06);
   const lines = ['SIGNAL LOST', 'RTG OUTPUT 0.0 W', '. . .', 'TIMELINE DIVERGENCE DETECTED', 'SWITCHING TO 2026-B'];
   setScene({
-    update() { if (this.t > 2.5 && !G.whatif) setWhatif(true); if (this.t > 6) { this.update = null; next(); } if (Math.random() < .2) beep(rnd(80, 2000), .02, 'square', .02); },
+    update() { if (this.t > 2.5 && !G.whatif) { setWhatif(true); music('whatif'); } if (this.t > 6) { this.update = null; next(); } if (Math.random() < .2) beep(rnd(80, 2000), .02, 'square', .02); },
     draw() {
       const c = C(); clear();
       for (let i = 0; i < 18; i++) rect(0, rnd(0, H), W, rnd(1, 6), Math.random() < .5 ? c.dim : c.bg);
@@ -57,7 +59,7 @@ function scanScene(next) {
   setScene({
     help: { title: 'FIND THE ASTEROID', goal: 'Click a slice of the radar to ping it. WARM = next to it, FOUND = got it.', keys: [['CLICK', 'ping a slice'], ['← → + SPACE', 'or pick a slice with keys']] },
     update() {
-      if (endAt) { if (this.t > endAt) { this.update = null; run.manual.Scan = found ? clamp(40 + pings * 20, 0, 100) : 20; next(); } return; }
+      if (endAt) { if (this.t > endAt) { this.update = null; run.manual.Scan = found ? clamp(40 + pings * 20, 0, 100) : 20; starsThen('DEEP SCAN', run.manual.Scan, found ? `Found with ${pings} ping${pings === 1 ? '' : 's'} to spare` : 'Found it the slow way', next); } return; }
       if (hit('ArrowRight') || hit('ArrowDown')) { sel = (sel + 1) % 8; sfx.tick(); }
       if (hit('ArrowLeft') || hit('ArrowUp')) { sel = (sel + 7) % 8; sfx.tick(); }
       const byMouse = M.clicked && Math.hypot(M.x - W / 2, M.y - H / 2) > 20;
@@ -65,7 +67,7 @@ function scanScene(next) {
       if (this.t > .3 && (byMouse || hit(' ') || hit('Enter'))) {
         const s = byMouse ? sectorAt(M.x, M.y) : sel; if (reads[s] !== undefined) return;
         pings--; const dd = Math.min((s - target + 8) % 8, (target - s + 8) % 8); reads[s] = dd; beep(1400 - dd * 300, .15, 'sine', .06);
-        if (dd === 0) { found = true; endAt = this.t + 2; sfx.ok(); }
+        if (dd === 0) { found = true; endAt = this.t + 2; sfx.ok(); const a = target * Math.PI / 4; burst(W / 2 + Math.cos(a) * 95, H / 2 + Math.sin(a) * 95, C().ok, 30, 80); }
         else if (pings <= 0) { found = false; endAt = this.t + 2.5; run.mothFuel = 70; reads[target] = 0; sfx.bad(); }
       }
     },
@@ -99,13 +101,16 @@ const PORT = { x: 84, y: 135 };
 function droneScene(mode, next) {
   const run = S.run;
   const p = mode === 'land' ? { x: 96, y: 135, vx: 0, vy: 0 } : { x: AST.x - AST.r - 6, y: AST.y, vx: 0, vy: 0 };
-  let fuel = mode === 'land' ? run.mothFuel : Math.max(35, run.mothFuel), dryT = 0, dmg = 0, state = 'fly', msg = '', msgT = 0, t0 = 0, trail = [];
+  let fuel = mode === 'land' ? run.mothFuel : Math.max(35, run.mothFuel), dryT = 0, dmg = 0, state = 'fly', msg = '', msgT = 0, t0 = 0, trail = [], hitT = 0;
+  const nRocks = { cadet: 4, engineer: 6, director: 8, sandbox: 4 }[S.diff];
+  const rocks = Array.from({ length: nRocks }, (_, i) => ({ x: 150 + i * (170 / nRocks) + rnd(-8, 8), y: rnd(10, H - 10), vy: rnd(14, 32) * (Math.random() < .5 ? -1 : 1), r: rnd(3, 6) }));
+  const ice = Array.from({ length: 3 }, () => ({ x: rnd(150, 320), y: rnd(30, H - 30), got: false }));
   ui(''); pad(true);
   const say = m => { msg = m; msgT = 2.5; };
   setScene({
     help: mode === 'land' ? { title: 'FLY THE DRONE', goal: 'Fly MOTH to the purple asteroid and land GENTLY (speed under 18).', keys: [['← ↑ ↓ →', 'fire thrusters'], ['TIP', 'tap, don\'t hold: there is no brake']] } : { title: 'DOCK', goal: 'Bring MOTH back to the GREEN port on the spacecraft, slowly (under 12).', keys: [['← ↑ ↓ →', 'fire thrusters']] },
     update(dt) {
-      msgT -= dt; if (state !== 'fly') { if (this.t > t0) { this.update = null; pad(false); next(); } return; }
+      msgT -= dt; if (state !== 'fly') { if (this.t > t0) { this.update = null; pad(false); const sc = mode === 'land' ? run.manual.Landing : run.manual.Docking; starsThen(mode === 'land' ? 'LANDING' : 'DOCKING', sc || 0, state === 'lost' ? 'Drone in trouble' : `Damage ${dmg}/3 · fuel ${fmt(fuel)}%`, next); } return; }
       const ax = (K.ArrowRight ? 1 : 0) - (K.ArrowLeft ? 1 : 0), ay = (K.ArrowDown ? 1 : 0) - (K.ArrowUp ? 1 : 0);
       if ((ax || ay) && fuel > 0) { p.vx += ax * 32 * dt; p.vy += ay * 32 * dt; fuel = Math.max(0, fuel - 7 * dt); if ((G.t * 20 | 0) % 2) beep(140, .02, 'sawtooth', .015); }
       const dx = AST.x - p.x, dy = AST.y - p.y, d2 = Math.max(400, dx * dx + dy * dy), g = 1400 / d2, dd = Math.sqrt(d2);
@@ -114,15 +119,19 @@ function droneScene(mode, next) {
       if (p.x < 4 || p.x > W - 4) { p.vx *= -.5; p.x = clamp(p.x, 4, W - 4); }
       if (p.y < 4 || p.y > H - 4) { p.vy *= -.5; p.y = clamp(p.y, 4, H - 4); }
       if ((this.t * 10 | 0) % 2) trail.push([p.x, p.y]); if (trail.length > 60) trail.shift();
+      hitT -= dt;
+      rocks.forEach(k => { k.y += k.vy * dt; if (k.y < 6 || k.y > H - 6) k.vy *= -1;
+        if (hitT <= 0 && Math.hypot(k.x - p.x, k.y - p.y) < k.r + 3) { hitT = 1; dmg++; const a = Math.atan2(p.y - k.y, p.x - k.x); p.vx = Math.cos(a) * 25; p.vy = Math.sin(a) * 25; shake(5); burst(p.x, p.y, C().bad, 18, 70); sfx.bad(); say(`DEBRIS HIT! damage ${dmg}/3`); chat(pick(LINES.echoBad)); } });
+      ice.forEach(k => { if (!k.got && Math.hypot(k.x - p.x, k.y - p.y) < 7) { k.got = true; fuel = Math.min(100, fuel + 15); pop(k.x, k.y - 10, '+15 FUEL', '#9fe8ff', 9); burst(k.x, k.y, '#9fe8ff', 14, 50); jingle([79, 84], .05, 'triangle'); } });
       const sp = Math.hypot(p.vx, p.vy), da = Math.hypot(p.x - AST.x, p.y - AST.y);
       if (mode === 'land' && da < AST.r + 3) {
-        if (sp < 18) { state = 'done'; t0 = this.t + 1.5; run.flags.moth = 'landed'; run.manual.Landing = clamp(100 - sp * 3 - dmg * 25, 0, 100); sfx.ok(); say(`TOUCHDOWN at ${fmt(sp, 1)} px/s`); }
+        if (sp < 18) { state = 'done'; t0 = this.t + 1.5; run.flags.moth = 'landed'; run.manual.Landing = clamp(100 - sp * 3 - dmg * 25, 0, 100); sfx.ok(); burst(p.x, p.y, C().ok, 26, 60); say(`TOUCHDOWN at ${fmt(sp, 1)} px/s`); chat(pick(LINES.echoGood)); }
         else bounce(da, AST, sp);
       }
       if (mode === 'dock') {
         const dp = Math.hypot(p.x - PORT.x, p.y - PORT.y);
         if (dp < 7) {
-          if (sp < 12) { state = 'done'; t0 = this.t + 1.5; run.manual.Docking = clamp(100 - sp * 5 - dmg * 25, 0, 100); sfx.ok(); say(`DOCKED. ${run.ore} ore delivered.`); }
+          if (sp < 12) { state = 'done'; t0 = this.t + 1.5; run.manual.Docking = clamp(100 - sp * 5 - dmg * 25, 0, 100); sfx.ok(); burst(p.x, p.y, C().ok, 30, 70); jingle([72, 76, 79, 84]); say(`DOCKED. ${run.ore} ore delivered.`); }
           else { dmg++; run.ore = Math.floor(run.ore / 2); p.vx = 25; p.vy *= -.5; sfx.bad(); say(`TOO FAST (${fmt(sp, 1)}): bounced off, half the ore spilled`); }
         } else if (p.x < 70 && Math.abs(p.y - 135) < 18 && sp > 12) { p.vx = Math.abs(p.vx) * .6 + 5; dmg++; sfx.bad(); say('Hit the spacecraft body. Aim for the port.'); }
         else if (da < AST.r + 2) {
@@ -145,6 +154,9 @@ function droneScene(mode, next) {
       ctx.fill(); for (let i = 0; i < 7; i++) { const a = i * .9 + G.t * .05; rect(AST.x + Math.cos(a) * 18, AST.y + Math.sin(a) * 14, 3, 2, c.acc); }
       voyager(60, 135, 1.6); rect(PORT.x - 3, PORT.y - 3, 6, 6, mode === 'dock' ? c.ok : c.dim);
       trail.forEach(([x, y]) => rect(x, y, 1, 1, c.dim));
+      rocks.forEach(k => { disc(k.x, k.y, k.r, '#7a6a8a'); rect(k.x - 1, k.y - 1, 2, 2, '#a090b0'); });
+      ice.forEach(k => { if (!k.got) { const g = (G.t * 4 | 0) % 2; rect(k.x - 2, k.y - 2, 4, 4, g ? '#9fe8ff' : '#e8fbff'); rect(k.x - 1, k.y - 4, 2, 8, '#9fe8ff'); } });
+      if (hitT > .7) { ctx.fillStyle = 'rgba(255,40,80,.18)'; ctx.fillRect(0, 0, W, H); }
       rect(p.x - 2, p.y - 2, 5, 5, c.hi); rect(p.x - 4, p.y, 2, 1, c.fg); rect(p.x + 3, p.y, 2, 1, c.fg);
       if (K.ArrowLeft && fuel) rect(p.x + 3, p.y - 1, 4, 3, c.acc); if (K.ArrowRight && fuel) rect(p.x - 7, p.y - 1, 4, 3, c.acc);
       if (K.ArrowUp && fuel) rect(p.x - 1, p.y + 3, 3, 4, c.acc); if (K.ArrowDown && fuel) rect(p.x - 1, p.y - 7, 3, 4, c.acc);
@@ -155,6 +167,7 @@ function droneScene(mode, next) {
     }
   });
   function bounce(da, o, sp) {
+    shake(5); burst(p.x, p.y, C().bad, 16, 60); chat(pick(LINES.echoBad));
     const nx = (p.x - o.x) / da, ny = (p.y - o.y) / da, dot = p.vx * nx + p.vy * ny;
     p.vx = (p.vx - 2 * dot * nx) * .5; p.vy = (p.vy - 2 * dot * ny) * .5; p.x = o.x + nx * (o.r + 4); p.y = o.y + ny * (o.r + 4);
     dmg++; sfx.bad(); say(`CRASH at ${fmt(sp, 1)} px/s: damage ${dmg}/3`);
@@ -164,18 +177,23 @@ function droneScene(mode, next) {
 // ---------- drill ----------
 function drillScene(next) {
   const run = S.run; run.ore = 0; run.flags.jam = false;
-  let pos = 0, dir = 1, heat = 0, zone = .22, center = rnd(.3, .7), jam = false, endAt = 0, flash = 0;
+  let pos = 0, dir = 1, heat = 0, zone = .22, center = rnd(.3, .7), jam = false, endAt = 0, flash = 0, combo = 0;
   ui(''); pad(true);
   setScene({
     help: { title: 'DRILL FOR ORE', goal: 'Hit the green zone to cut ore. Misses heat the drill.', keys: [['SPACE / CLICK', 'drill now']] },
     update(dt) {
       flash -= dt;
-      if (endAt) { if (this.t > endAt) { this.update = null; pad(false); run.manual.Drill = clamp(run.ore / 8 * 100, 0, 100); next(); } return; }
+      if (endAt) { if (this.t > endAt) { this.update = null; pad(false); run.manual.Drill = clamp(run.ore / 8 * 100, 0, 100); starsThen('DRILLING', run.manual.Drill, `${run.ore} ore = +${run.ore * 10} W`, next); } return; }
       pos += dir * dt * (0.9 + run.ore * .12); if (pos > 1) { pos = 1; dir = -1; } if (pos < 0) { pos = 0; dir = 1; }
       heat = Math.max(0, heat - 9 * dt);
       if (this.t > .4 && action()) {
-        if (Math.abs(pos - center) < zone / 2) { run.ore++; heat += 14; flash = .15; sfx.ok(); zone = Math.max(.08, zone * .88); center = rnd(.15, .85); }
-        else { heat += 30; sfx.bad(); }
+        if (Math.abs(pos - center) < zone / 2) {
+          const perfect = Math.abs(pos - center) < zone / 6;
+          run.ore++; heat += perfect ? 6 : 14; flash = .15; zone = Math.max(.08, zone * .88); center = rnd(.15, .85); combo++;
+          shake(perfect ? 4 : 2); burst(W / 2, 190, perfect ? '#ffe14d' : C().acc, perfect ? 30 : 16, 90);
+          pop(W / 2, 150, perfect ? 'PERFECT!' : 'ORE +1', perfect ? '#ffe14d' : C().ok, 10); perfect ? jingle([76, 83, 88], .05) : sfx.ok();
+          if (combo === 4) chat(pick(LINES.echoGood));
+        } else { heat += 30; sfx.bad(); combo = 0; shake(2); pop(W / 2, 150, 'MISS', C().bad, 9); }
       }
       if (heat >= 100) { jam = true; run.flags.jam = true; endAt = this.t + 2; sfx.bad(); }
       if (run.ore >= 8 || this.t > 25) endAt = this.t + 1.5;
@@ -228,7 +246,7 @@ function pointScene(next) {
   setScene({
     help: { title: 'CALL HOME', goal: 'Keep the circle on Earth (the blue dot) for 5 seconds to send your message.', keys: [['MOUSE / ← ↑ ↓ →', 'steer the antenna']] },
     update(dt) {
-      if (endAt) { if (this.t > endAt) { this.update = null; pad(false); next(); } return; }
+      if (endAt) { if (this.t > endAt) { this.update = null; pad(false); starsThen('CALL HOME', run.manual.Pointing, run.flags.sent ? 'Message sent to Earth' : 'Signal lost', next); } return; }
       const ax = (K.ArrowRight ? 1 : 0) - (K.ArrowLeft ? 1 : 0), ay = (K.ArrowDown ? 1 : 0) - (K.ArrowUp ? 1 : 0);
       vx += (ax * 40 + Math.sin(this.t * 1.3) * 14) * dt; vy += (ay * 40 + Math.cos(this.t * .9) * 14) * dt;
       if (G.t - M.moved < .5) { vx += (M.x - rx) * dt * 2; vy += (M.y - ry) * dt * 2; }
@@ -236,7 +254,7 @@ function pointScene(next) {
       const ex = W / 2 + Math.sin(this.t * .4) * 30, ey = H / 2 + Math.cos(this.t * .3) * 20;
       this.e = [ex, ey];
       if (Math.hypot(rx - ex, ry - ey) < 8) { lock += dt; if ((G.t * 10 | 0) % 2) beep(1000 + lock * 100, .02, 'sine', .02); }
-      if (lock >= 5 || this.t > 25) { endAt = this.t + 1; run.manual.Pointing = clamp(lock / 5 * 100, 0, 100); run.flags.sent = lock >= 5; (lock >= 5 ? sfx.ok : sfx.bad)(); }
+      if (lock >= 5 || this.t > 25) { endAt = this.t + 1; run.manual.Pointing = clamp(lock / 5 * 100, 0, 100); run.flags.sent = lock >= 5; if (lock >= 5) { burst(rx, ry, '#9fd8ff', 40, 100); jingle([72, 76, 79, 84, 88], .1, 'triangle'); } else sfx.bad(); }
     },
     draw(dt) {
       const c = C(); clear(); stars(3, 1, dt);
