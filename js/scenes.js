@@ -180,7 +180,8 @@ function imaging(P, next) {
         const p = pos(tg, t); if (!p.vis) return;
         if (tg.spot) { ctx.fillStyle = '#c0442a'; ctx.beginPath(); ctx.ellipse(p.x, p.y, 7, 4, 0, 0, 7); ctx.fill(); }
         else if (!tg.ringT) disc(p.x, p.y, p.r, tg.col);
-        if (cam && !got.has(tg.n) && DIFF[S.diff].hint) txt(tg.n, p.x, p.y - p.r - 7, col.dim, 12, 'center');
+        else if (!got.has(tg.n)) { const b = (G.t * 3 | 0) % 2; rect(p.x - 2, p.y - 4, 4, 8, b ? '#fff1c4' : '#cfb57c'); rect(p.x - 4, p.y - 2, 8, 4, b ? '#fff1c4' : '#cfb57c'); }
+        if (cam && !got.has(tg.n) && (DIFF[S.diff].hint || tg.ringT)) txt(tg.ringT ? '◆ RINGS' : tg.n, p.x, p.y - p.r - 7, tg.ringT ? col.hi : col.dim, 12, 'center');
         if (got.has(tg.n)) txt('✓', p.x + p.r + 4, p.y - p.r - 2, col.ok, 14);
       });
       if (P.name === 'JUPITER') { ctx.fillStyle = 'rgba(0,0,0,.45)'; ctx.beginPath(); ctx.arc(px, py, pr, Math.PI / 2, Math.PI * 1.5); ctx.fill(); }
