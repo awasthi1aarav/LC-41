@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LC-41 · The Last Lifeline</title>
+<meta name="description" content="A retro space mission design game: design Voyager 1, fly the Grand Tour, then save it in a what-if timeline.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="crt">
+  <canvas id="cv" aria-label="Game screen"></canvas>
+  <div id="ui"></div>
+  <div id="pad" hidden>
+    <button data-k="ArrowLeft">◀</button><button data-k="ArrowUp">▲</button><button data-k="ArrowDown">▼</button><button data-k="ArrowRight">▶</button><button data-k=" " class="act">ACTION</button>
+  </div>
+  <div id="scan"></div>
+</div>
+<button id="mute" title="Sound on/off">♪ ON</button>
+<script src="js/data.js"></script>
+<script src="js/core.js"></script>
+<script src="js/design.js"></script>
+<script src="js/scenes.js"></script>
+<script src="js/whatif.js"></script>
+<script src="js/report.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
