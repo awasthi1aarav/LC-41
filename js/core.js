@@ -24,6 +24,7 @@ addEventListener('keydown', e => {
   const a = document.activeElement;
   if (a && a.classList && a.classList.contains('opt') && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); a.click(); }
   if (e.key === 'Escape' && S.run && !$('#menuBtn').hidden) togglePause();
+  if ((e.key === 'h' || e.key === 'H') && S.run && !$('#helpBtn').hidden && e.target.tagName !== 'INPUT') reopenHelp();
 }, true);
 ['pointerdown', 'keydown'].forEach(ev => addEventListener(ev, () => { if (AC && AC.state === 'suspended') AC.resume(); }));
 addEventListener('blur', () => { for (const k in K) K[k] = false; });
@@ -129,7 +130,8 @@ function showHelp(s) {
     <div class="keys">${h.keys.map(([k, v]) => `<div><span class="key">${k}</span><span>${v}</span></div>`).join('')}</div>
     <button class="big" id="hgo">START ▶</button><p class="muted">or press SPACE</p></div>`;
   document.getElementById('crt').appendChild(el);
-  const kd = e => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); setTimeout(go, 0); } };
+  const shown = performance.now();
+  const kd = e => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); if (performance.now() - shown > 1200) setTimeout(go, 0); } };
   const go = () => { if (s.ready) return; s.ready = true; s.t = 0; el.remove(); removeEventListener('keydown', kd); pressed.clear(); M.clicked = false; };
   addEventListener('keydown', kd); el.querySelector('#hgo').onclick = go;
 }
@@ -153,7 +155,18 @@ function ui(html, pass = false) {
   UI.querySelectorAll('.opt').forEach(o => { o.tabIndex = 0; o.setAttribute('role', 'button'); });
 }
 // Pause / quit during a mission
-function inRun(on) { $('#menuBtn').hidden = !on; }
+function inRun(on) { $('#menuBtn').hidden = !on; $('#helpBtn').hidden = !on; }
+// Re-open the how-to-play card for the current part at any time (button or H key)
+function reopenHelp() {
+  if ($('#help') || $('#pause') || $('#emerg')) return;
+  const s = G.scene, h = s && s.help;
+  G.paused = true;
+  const el = document.createElement('div'); el.id = 'help'; el.className = 'modal';
+  el.innerHTML = `<div class="box helpbox"><p class="muted px" style="font-size:10px">HOW TO PLAY · PAUSED</p>${h ? `<h2>${h.title}</h2><p class="hi goal">${h.goal}</p><div class="keys">${h.keys.map(([k, v]) => `<div><span class="key">${k}</span><span>${v}</span></div>`).join('')}</div>` : '<h2>NOTHING TO CONTROL HERE</h2><p>Read the screen and press the button to continue.</p>'}<button class="big" id="hres">▶ BACK TO THE GAME</button></div>`;
+  document.getElementById('crt').appendChild(el);
+  $('#hres').onclick = () => { el.remove(); G.paused = false; };
+}
+$('#helpBtn').onclick = reopenHelp;
 function togglePause() {
   const open = $('#pause');
   if (open) { open.remove(); G.paused = false; return; }

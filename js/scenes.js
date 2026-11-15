@@ -330,7 +330,7 @@ function longNight(next) {
     r();
   }
   setScene({
-    help: { title: 'THE LONG NIGHT', goal: 'Power fades every year. Keep DRAW below SUPPLY by switching things off, or the computer does it for you.', keys: [['CLICK a load', 'or press 1-9: on / off'], ['KEEP ON', 'thruster line heaters (or the fuel freezes)'], ['HOLD F', 'fast-forward']] },
+    help: { title: 'THE LONG NIGHT', goal: 'SUPPLY = power the RTGs make. It shrinks every year. DRAW = power everything switched ON uses. If DRAW gets bigger than SUPPLY, something breaks. So switch things OFF to keep DRAW smaller than SUPPLY.', keys: [['CLICK an item', 'in the list (or press 1-9) to switch it on / off'], ['NEVER OFF', 'the red "thruster line heaters": without them the fuel freezes and you lose Earth'], ['HOLD F', 'skip ahead faster']] },
     update(dt) {
       if (ended) return;
       for (let i = 1; i <= 10; i++) if (hit(String(i % 10))) toggle(i - 1);
@@ -365,7 +365,8 @@ function longNight(next) {
       txt(`${Math.floor(y)}`, gx, 22, col.hi, 18, 'left', 'px');
       txt(`${fmt(distAU(y))} AU · ${fmt(lightHours(distAU(y)), 1)} light-hours`, gx + 90, 22, col.fg, 16);
       const s = supply(), dd = draw();
-      txt(`SUPPLY ${fmt(s, 1)} W   DRAW ${fmt(dd, 1)} W   MARGIN ${fmt(s - dd, 1)} W`, gx, 208, s - dd < 5 ? col.bad : col.hi, 17);
+      txt(`SUPPLY ${fmt(s, 1)} W   DRAW ${fmt(dd, 1)} W   SPARE ${fmt(s - dd, 1)} W`, gx, 208, s - dd < 5 ? col.bad : col.hi, 17);
+      if (s - dd < 6 && (G.t * 3 | 0) % 2) txt('LOW POWER! Switch something OFF →', gx + 130, 40, col.bad, 15, 'center');
       txt(`Hydrazine ${fmt(Math.max(0, run.hyd), 1)} kg · faults ${run.faults} · deep-space science ${fmt(run.sci.inter)}`, gx, 224, col.fg, 16);
       voyager(290, 30, 1);
       if (bannerT > 0) { const ws = banner.split(' '), ls = ['']; ws.forEach(w => { if ((ls[ls.length - 1] + ' ' + w).length > 58) ls.push(w); else ls[ls.length - 1] += (ls[ls.length - 1] ? ' ' : '') + w; });

@@ -121,3 +121,6 @@ td.n{text-align:right}
 .side .craft{margin-top:10px}
 .dwrap .cols3{grid-template-columns:1fr}
 @media (max-width:900px){.dwrap{grid-template-columns:1fr}.side{position:static}}
+
+body.ui-full #ui{pointer-events:auto}
+#helpBtn{position:fixed;right:178px;top:8px;font-size:10px;z-index:5;padding:6px 8px;opacity:.85}
