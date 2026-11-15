@@ -34,64 +34,73 @@ function calc(d) {
 }
 const supplyAt = (d, y) => d.rtg * RTG.watts * Math.exp(-K_DECAY * (y - LAUNCH - WINDOWS[d.win].delay));
 
-function designScreen() {
+let STEP = 0;
+const STEPS = [
+  { role: 'director', title: 'CHOOSE YOUR GOAL', sub: 'What is this mission for? This changes how your score is counted.' },
+  { role: 'director', title: 'ROCKET & LAUNCH DATE', sub: 'A bigger rocket lifts more mass. Launch late and the planets drift out of line.' },
+  { role: 'engineer', title: 'SPACECRAFT & POWER', sub: 'RTGs are nuclear batteries that slowly fade. More RTGs = power for longer, but more mass and cost.' },
+  { role: 'science', title: 'SCIENCE INSTRUMENTS', sub: 'Tap to add or remove. Each one costs mass, power and money.' },
+  { role: 'capcom', title: 'COMMUNICATIONS', sub: 'Science only counts if it reaches Earth.' },
+  { role: null, title: 'READY TO LAUNCH?', sub: 'Fix anything red, then launch.' },
+];
+
+function designScreen(step) {
   setWhatif(false); pad(false);
+  if (step !== undefined) STEP = step;
   setScene({ draw() { clear(); stars(3, 0, 1 / 60); } });
-  const d = S.design;
-  const own = r => S.mode === 'crew' ? `<span class="who">${esc(nameFor(r))}</span>` : '';
-  const opt = (key, val, o, extra = '') => `<div class="opt ${d[key] === val ? 'on' : ''} ${extra}" data-k="${key}" data-v="${val}">${o.name}<small>${o.desc || ''}</small></div>`;
+  const d = S.design, go = {};
+  const opt = (key, val, name, desc, extra = '') => `<div class="opt big ${d[key] === val ? 'on' : ''} ${extra}" data-k="${key}" data-v="${val}"><b>${name}</b><small>${desc}</small></div>`;
   const render = () => {
-    const sy = UI.scrollTop, c = calc(d), diff = DIFF[S.diff];
-    const m = (label, val, frac, state, sub) => `<div class="meter ${state}"><b>${label}</b>${val}<div class="bar"><i style="width:${clamp(frac, 0, 1) * 100}%"></i></div>${sub ? `<small class="muted">${sub}</small>` : ''}</div>`;
+    const c = calc(d), diff = DIFF[S.diff], st = STEPS[STEP];
+    const m = (label, val, frac, bad) => `<div class="meter ${bad ? 'red' : ''}"><b>${label}</b>${val}<div class="bar"><i style="width:${clamp(frac, 0, 1) * 100}%"></i></div></div>`;
+    const who = st.role && S.mode === 'crew' ? `<span class="tag">${ROLES[st.role].name} · ${esc(nameFor(st.role))}</span>` : '';
+    let body = '';
+    if (STEP === 0) body = `${Object.entries(OBJECTIVES).map(([k, o]) => opt('obj', k, o.name, o.desc)).join('')}
+      <p style="text-align:center;margin-top:14px"><button id="real">⚡ QUICK START: use the real 1977 Voyager design</button></p>`;
+    if (STEP === 1) body = `<h3>ROCKET</h3><div class="cols">${Object.entries(LVS).map(([k, o]) => opt('lv', k, o.name, `Lifts up to ${o.max} kg · $${o.cost}M<br>${o.desc}`)).join('')}</div>
+      <h3>LAUNCH DATE</h3><div class="cols3">${Object.entries(WINDOWS).map(([k, o]) => opt('win', k, o.name, `${o.cost ? '+$' + o.cost + 'M · ' : ''}${o.desc}`)).join('')}</div>`;
+    if (STEP === 2) body = `<h3>SPACECRAFT BODY</h3><div class="cols">${Object.entries(BUSES).map(([k, o]) => opt('bus', k, o.name, `${o.mass} kg · $${o.cost}M<br>${o.desc}`)).join('')}</div>
+      <div class="cols"><div class="panel"><h3>RTGs</h3><div class="row" style="justify-content:center"><button class="big" data-rtg="-1">−</button><span class="px hi" style="font-size:28px;margin:0 14px">${d.rtg}</span><button class="big" data-rtg="1">+</button></div>
+        <p style="text-align:center">${c.supply0} W at launch · runs out ~<b class="hi">${Math.floor(c.silence)}</b></p><canvas class="mini" id="pg" width="240" height="60"></canvas></div>
+        <div class="panel"><h3>HYDRAZINE FUEL</h3><p class="px hi" style="font-size:22px;text-align:center" id="hv">${d.hyd} kg</p><input type="range" min="50" max="140" step="2" value="${d.hyd}" id="hyd">
+        <p style="text-align:center">Keeps the antenna pointed at Earth until ~<b class="hi">${Math.floor(c.hydOut)}</b></p></div></div>`;
+    if (STEP === 3) body = `<div class="cols">${INST.map(i => { const dis = c.bus.noPlatform && i.platform; return `<div class="opt big ${d.inst[i.id] && !dis ? 'on' : ''} ${dis ? 'dis' : ''}" data-i="${i.id}"><b>${d.inst[i.id] && !dis ? '☑' : '☐'} ${i.name}</b><small>${i.mass} kg · ${i.power} W · $${i.cost}M · best for: ${i.p >= i.i * 1.5 ? 'planets' : i.i >= i.p * 1.5 ? 'deep space' : 'both'}${dis ? ' · needs the scan-platform body' : ''}</small></div>`; }).join('')}</div>`;
+    if (STEP === 4) body = `<h3>ANTENNA DISH</h3><div class="cols">${Object.entries(HGAS).map(([k, o]) => opt('hga', k, o.name, `${o.mass} kg · $${o.cost}M<br>${o.desc}`)).join('')}</div>
+      <h3>TAPE RECORDER</h3><div class="opt big ${d.tape ? 'on' : ''}" id="tape"><b>${d.tape ? '☑' : '☐'} Digital tape recorder</b><small>${TAPE.mass} kg · ${TAPE.power} W · $${TAPE.cost}M · stores data during fast flybys</small></div>
+      <p class="px" style="font-size:12px;text-align:center;margin-top:12px">DATA PER FLYBY: <span class="${c.demand > c.dataCap ? 'bad' : 'ok'}">${c.demand} made / ${c.dataCap} can send</span></p>`;
+    if (STEP === 5) {
+      const fixStep = msg => /heavy/i.test(msg) ? 1 : /power/i.test(msg) ? 2 : /budget/i.test(msg) ? 3 : /Hydrazine/.test(msg) ? 2 : /data|instruments make/i.test(msg) ? 4 : null;
+      body = `${c.checks.map(k => { const f = k.ok ? null : fixStep(k.msg); return `<p class="${k.ok ? 'ok' : k.hard ? 'bad' : ''}">${k.ok ? '✓' : k.hard ? '✗' : '!'} ${k.msg} ${f !== null ? `<button data-go="${f}">FIX ▶</button>` : ''}</p>`; }).join('')}
+        <h3 style="margin-top:14px">${S.mode === 'crew' ? 'PERSONAL GOALS' : 'BONUS GOALS'}</h3>
+        ${ROLE_ORDER.map(r => `<p>• <span class="hi">${ROLES[r].name}${S.mode === 'crew' ? ' (' + esc(nameFor(r)) + ')' : ''}:</span> ${ROLES[r].goal}</p>`).join('')}
+        ${S.mode === 'crew' ? `<p style="text-align:center;margin-top:12px">${S.players.map((p, i) => `<button class="${go[i] ? 'on' : ''}" data-p="${i}">${esc(p.name)}: ${go[i] ? 'GO ✓' : 'NO-GO'}</button>`).join('')}</p>` : ''}`;
+    }
+    const allGo = S.mode !== 'crew' || S.players.every((p, i) => go[i]);
     ui(`<div class="design">
       <div class="meters">
-        ${m('MASS', `${fmt(c.mass)} / ${c.lv.max} kg`, c.mass / c.lv.max, c.mass > c.lv.max ? 'red' : c.massMargin < .03 ? 'warn' : '')}
-        ${m('POWER @ LAUNCH', `${fmt(c.draw0)} / ${c.supply0} W`, c.draw0 / c.supply0, c.draw0 > c.supply0 ? 'red' : c.margin < .15 ? 'warn' : '')}
-        ${m('BUDGET', `$${fmt(c.cost)}M / ${diff.budget === Infinity ? '∞' : '$' + diff.budget + 'M'}`, c.cost / (diff.budget === Infinity ? c.cost * 2 : diff.budget), c.cost > diff.budget ? 'red' : '')}
-        ${m('DATA / FLYBY', `${c.demand} made / ${c.dataCap} sent`, c.demand / Math.max(1, c.dataCap), c.demand > c.dataCap ? 'warn' : '')}
-        ${m('LIFETIME', `until ~${Math.floor(c.end)}`, (c.end - 1977) / 70, c.end < 2026 ? 'warn' : '', c.hydOut < c.silence ? 'limited by hydrazine' : 'limited by power')}
-        ${m('SCIENCE KIT', `${c.flown.length} / 10 instr.`, c.flown.length / 10, '')}
+        ${m('MASS', `${fmt(c.mass)} / ${c.lv.max} kg`, c.mass / c.lv.max, c.mass > c.lv.max)}
+        ${m('POWER', `${fmt(c.draw0)} / ${c.supply0} W`, c.draw0 / c.supply0, c.draw0 > c.supply0)}
+        ${m('BUDGET', `$${fmt(c.cost)}M / ${diff.budget === Infinity ? '∞' : '$' + diff.budget + 'M'}`, c.cost / (diff.budget === Infinity ? c.cost * 2 : diff.budget), c.cost > diff.budget)}
+        ${m('LIFETIME', `until ~${Math.floor(c.end)}`, (c.end - 1977) / 70, false)}
+        ${m('INSTRUMENTS', `${c.flown.length} / 10`, c.flown.length / 10, false)}
       </div>
-      <div class="row" style="justify-content:space-between;margin-top:8px"><h2 style="margin:0">MISSION DESIGN · 1977</h2>
-        <span class="muted">Difficulty: ${diff.name} · <span class="clk" id="real" style="cursor:pointer;text-decoration:underline">load the real Voyager design</span></span></div>
-      <div class="grid">
-        <div class="panel">${own('director')}<h3>FLIGHT DIRECTOR</h3>
-          <p class="muted">Mission objective</p>${Object.entries(OBJECTIVES).map(([k, o]) => opt('obj', k, o)).join('')}
-          <p class="muted">Launch vehicle</p>${Object.entries(LVS).map(([k, o]) => opt('lv', k, { name: `${o.name} · ${o.max} kg · $${o.cost}M`, desc: o.desc })).join('')}
-          <p class="muted">Launch window</p>${Object.entries(WINDOWS).map(([k, o]) => opt('win', k, { name: `${o.name}${o.cost ? ' · +$' + o.cost + 'M' : ''}`, desc: o.desc })).join('')}
-          <div class="learn">${LEARN.director}</div></div>
-        <div class="panel">${own('engineer')}<h3>SPACECRAFT ENGINEER</h3>
-          <p class="muted">Spacecraft bus</p>${Object.entries(BUSES).map(([k, o]) => opt('bus', k, { name: `${o.name} · ${o.mass} kg · $${o.cost}M`, desc: o.desc })).join('')}
-          <p class="muted">RTGs (nuclear power) · ${RTG.mass} kg, ${RTG.watts} W, $${RTG.cost}M each</p>
-          <div class="row"><button data-rtg="-1">−</button><span class="hi px" style="font-size:16px">${d.rtg}</span><button data-rtg="1">+</button>
-            <span>${c.supply0} W at launch → ${fmt(supplyAt(d, 2026))} W in 2026 · silent by ~${Math.floor(c.silence)}</span></div>
-          <canvas class="mini" id="pg" width="240" height="60"></canvas>
-          <p class="muted">Hydrazine fuel: <span class="hi">${d.hyd} kg</span> (lasts until ~${Math.floor(c.hydOut)})</p>
-          <input type="range" min="50" max="140" step="2" value="${d.hyd}" id="hyd">
-          <div class="learn">${LEARN.engineer}</div></div>
-        <div class="panel">${own('science')}<h3>SCIENCE OFFICER</h3>
-          <div class="inst">${INST.map(i => { const dis = c.bus.noPlatform && i.platform; return `<div class="opt ${d.inst[i.id] && !dis ? 'on' : ''} ${dis ? 'dis' : ''}" data-i="${i.id}">${i.id} · ${i.name}<small>${i.mass} kg · ${i.power} W · $${i.cost}M · planets ${'★'.repeat(Math.ceil(i.p / 8))} deep space ${'★'.repeat(Math.ceil(i.i / 4)) || '–'}</small></div>`; }).join('')}</div>
-          <div class="learn">${LEARN.science}</div></div>
-        <div class="panel">${own('capcom')}<h3>CAPCOM / COMMS</h3>
-          <p class="muted">High-gain antenna</p>${Object.entries(HGAS).map(([k, o]) => opt('hga', k, { name: `${o.name} · ${o.mass} kg · $${o.cost}M`, desc: o.desc })).join('')}
-          <div class="opt ${d.tape ? 'on' : ''}" id="tape">Digital tape recorder · ${TAPE.mass} kg · ${TAPE.power} W · $${TAPE.cost}M<small>Stores fast-flyby data to send home later.</small></div>
-          <p>Each flyby your instruments make <span class="hi">${c.demand}</span> data units; you can send or store <span class="hi">${c.dataCap}</span>.</p>
-          <div class="learn">${LEARN.capcom}</div></div>
-      </div>
-      <ul class="checks">${c.checks.map(k => `<li class="${k.ok ? 'ok' : k.hard ? 'bad' : ''}">${k.ok ? '✓' : k.hard ? '✗ NO-GO:' : '! '} ${k.msg}</li>`).join('')}</ul>
-      ${S.mode === 'crew' ? `<p class="muted">Personal goals: ${S.players.map(p => `<b class="hi">${esc(p.name)}</b> (${p.roles.map(r => ROLES[r].short).join('/')})`).join(', ')}. Each role has a goal, revealed at the poll. They pull in different directions: negotiate!</p>` : `<p class="muted">Bonus goals: ${ROLE_ORDER.map(r => ROLES[r].goal).join(' ')}</p>`}
-      <div class="foot"><button id="back">◀ MENU</button><span class="muted">${c.nogo ? '<span class="bad">Fix the NO-GO items to launch.</span>' : 'All hard checks pass.'}</span><button class="big" id="poll" ${c.nogo ? 'disabled' : ''}>GO / NO-GO POLL ▶</button></div>
+      <div class="step"><p class="muted px" style="font-size:10px">STEP ${STEP + 1} OF ${STEPS.length}</p><h2>${st.title}</h2>${who}<p>${st.sub}</p>${body}</div>
+      <div class="foot"><button class="big" id="back">◀ ${STEP ? 'BACK' : 'MENU'}</button>
+        <span class="dots">${STEPS.map((_, i) => `<button class="dot ${i === STEP ? 'on' : ''}" data-s="${i}" title="${STEPS[i].title}">${i + 1}</button>`).join('')}</span>
+        ${STEP < STEPS.length - 1 ? '<button class="big" id="next">NEXT ▶</button>' : `<button class="big" id="launch" ${c.nogo || !allGo ? 'disabled' : ''}>🚀 LAUNCH</button>`}</div>
     </div>`);
-    UI.scrollTop = sy;
     UI.querySelectorAll('.opt[data-k]').forEach(e => e.onclick = () => { d[e.dataset.k] = e.dataset.v; beep(600, .03); render(); });
     UI.querySelectorAll('.opt[data-i]').forEach(e => e.onclick = () => { if (e.classList.contains('dis')) return sfx.bad(); d.inst[e.dataset.i] = !d.inst[e.dataset.i]; beep(600, .03); render(); });
     UI.querySelectorAll('[data-rtg]').forEach(b => b.onclick = () => { d.rtg = clamp(d.rtg + +b.dataset.rtg, 1, 5); beep(500, .03); render(); });
-    $('#hyd').oninput = e => { d.hyd = +e.target.value; };
-    $('#hyd').onchange = render;
-    $('#tape').onclick = () => { d.tape = !d.tape; render(); };
-    $('#real').onclick = () => { S.design = JSON.parse(JSON.stringify(REAL_DESIGN)); Object.assign(d, S.design); sfx.ok(); render(); };
-    $('#back').onclick = () => menu();
-    $('#poll').onclick = () => poll(c);
+    UI.querySelectorAll('[data-s]').forEach(b => b.onclick = () => { STEP = +b.dataset.s; beep(700, .03); render(); });
+    UI.querySelectorAll('[data-go]').forEach(b => b.onclick = () => { STEP = +b.dataset.go; render(); });
+    UI.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { go[b.dataset.p] = !go[b.dataset.p]; beep(go[b.dataset.p] ? 880 : 300, .05); render(); });
+    const h = $('#hyd'); if (h) { h.oninput = e => { d.hyd = +e.target.value; $('#hv').textContent = d.hyd + ' kg'; }; h.onchange = render; }
+    const t = $('#tape'); if (t) t.onclick = () => { d.tape = !d.tape; beep(600, .03); render(); };
+    const r = $('#real'); if (r) r.onclick = () => { Object.assign(d, JSON.parse(JSON.stringify(REAL_DESIGN))); STEP = 5; sfx.ok(); render(); };
+    $('#back').onclick = () => { if (STEP) { STEP--; render(); } else menu(); };
+    const n = $('#next'); if (n) n.onclick = () => { STEP++; sfx.ok(); render(); };
+    const l = $('#launch'); if (l) l.onclick = () => startRun();
     drawPowerGraph(d, c);
   };
   render();
@@ -109,22 +118,3 @@ function drawPowerGraph(d, c) {
   x.font = '10px VT323'; x.fillStyle = col.hi; x.fillText('RTG power vs needed (dashed) · 1977-2060 · line = 2026', 3, 9);
 }
 
-function poll(c) {
-  const goals = S.mode === 'crew'
-    ? S.players.map(p => `<p><b class="hi">${esc(p.name)}</b>: ${p.roles.map(r => `<br>• <span class="muted">${ROLES[r].name}:</span> ${ROLES[r].goal}`).join('')}</p>`).join('')
-    : ROLE_ORDER.map(r => `<p>• <span class="muted">${ROLES[r].name}:</span> ${ROLES[r].goal}</p>`).join('');
-  const st = {};
-  const render = () => {
-    const all = S.players.every((p, i) => st[i]);
-    ui(`<div class="center"><div class="box" style="max-width:760px;text-align:left"><h2>GO / NO-GO POLL</h2>
-      <p>Flight, this is the final poll for launch. ${S.mode === 'crew' ? 'Each controller: are you GO?' : ''}</p>
-      ${c.checks.filter(k => !k.ok).map(k => `<p class="bad">! ${k.msg}</p>`).join('') || '<p class="ok">All systems nominal.</p>'}
-      <h3 style="margin-top:12px">${S.mode === 'crew' ? 'Personal goals' : 'Bonus goals'}</h3>${goals}
-      <p style="text-align:center">${S.players.map((p, i) => `<button class="${st[i] ? 'on' : ''}" data-p="${i}">${esc(p.name)}: ${st[i] ? 'GO' : 'NO-GO'}</button>`).join('')}</p>
-      <p style="text-align:center"><button id="nb">◀ BACK TO DESIGN</button><button class="big" id="lg" ${all ? '' : 'disabled'}>LAUNCH ▶</button></p></div></div>`);
-    UI.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { st[b.dataset.p] = !st[b.dataset.p]; beep(st[b.dataset.p] ? 880 : 300, .05); render(); });
-    $('#nb').onclick = designScreen;
-    $('#lg').onclick = () => startRun();
-  };
-  render();
-}

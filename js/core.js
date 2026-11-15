@@ -110,12 +110,28 @@ function bar(x, y, w, h, frac, col, label) {
 }
 
 // ---------- scenes & flow ----------
-function setScene(s) { G.scene = s; s.t = 0; s.enter && s.enter(); }
+function setScene(s) {
+  G.scene = s; s.t = 0; s.ready = !s.help; s.enter && s.enter();
+  const old = document.getElementById('help'); if (old) old.remove();
+  if (s.help) showHelp(s);
+}
+// "How to play this bit" overlay shown before every mini-game
+function showHelp(s) {
+  const h = s.help, el = document.createElement('div');
+  el.id = 'help'; el.className = 'modal';
+  el.innerHTML = `<div class="box helpbox"><p class="muted px" style="font-size:10px">HOW TO PLAY</p><h2>${h.title}</h2><p class="hi goal">${h.goal}</p>
+    <div class="keys">${h.keys.map(([k, v]) => `<div><span class="key">${k}</span><span>${v}</span></div>`).join('')}</div>
+    <button class="big" id="hgo">START ▶</button><p class="muted">or press SPACE</p></div>`;
+  document.getElementById('crt').appendChild(el);
+  const kd = e => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); setTimeout(go, 0); } };
+  const go = () => { if (s.ready) return; s.ready = true; s.t = 0; el.remove(); removeEventListener('keydown', kd); pressed.clear(); M.clicked = false; };
+  addEventListener('keydown', kd); el.querySelector('#hgo').onclick = go;
+}
 let last = performance.now();
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now; G.t += dt;
   const s = G.scene;
-  if (s) { s.t += dt; s.update && s.update(dt); s.draw && s.draw(dt); }
+  if (s) { if (s.ready) { s.t += dt; s.update && s.update(dt); } s.draw && s.draw(s.ready ? dt : 0); }
   pressed.clear(); M.clicked = false;
   requestAnimationFrame(frame);
 }
@@ -134,12 +150,11 @@ function nameFor(role) { const p = playersFor(role)[0]; return p ? p.name : 'YOU
 
 // "STATION: X - take the controls"
 function station(role, what, next) {
+  if (S.mode !== 'crew') return next();
   const r = ROLES[role];
   setScene({ draw() { clear(); stars(8, 0, 1 / 60); } });
-  ui(`<div class="center"><div class="box">
-    <p class="muted px" style="font-size:10px">STATION</p><h2>${r.name}</h2>
-    ${S.mode === 'crew' ? `<p class="hi">${esc(nameFor(role))}, take the controls.</p>` : ''}
-    <p>${what}</p><button class="big" id="go">READY ▶</button></div></div>`);
+  ui(`<div class="center"><div class="box"><p class="muted px" style="font-size:10px">YOUR TURN</p><h2>${esc(nameFor(role))}</h2><p class="hi">${r.name}</p>
+    <button class="big" id="go">TAKE THE CONTROLS ▶</button></div></div>`);
   beep(880, .05); $('#go').onclick = () => { sfx.ok(); next(); }; $('#go').focus();
 }
 
@@ -176,22 +191,10 @@ function card(lines, next, opts = {}) {
     ${opts.title ? `<h2>${opts.title}</h2>` : ''}${opts.tag ? `<span class="tag ${opts.fiction ? 'fiction' : ''}">${opts.tag}</span>` : ''}
     <div id="tw"></div><p style="text-align:right"><button id="go" class="big" hidden>${opts.btn || 'CONTINUE ▶'}</button></p></div></div>`);
   const tw = $('#tw'), go = $('#go');
-  let li = 0, ci = 0, skip = false, timer;
-  const finish = () => { clearInterval(timer); tw.innerHTML = lines.map(l => `<p>${l}</p>`).join(''); go.hidden = false; go.focus(); };
-  timer = setInterval(() => {
-    if (skip || li >= lines.length) return finish();
-    if (ci === 0) tw.insertAdjacentHTML('beforeend', '<p></p>');
-    const plain = lines[li].replace(/<[^>]+>/g, '');
-    ci++; tw.lastChild.textContent = plain.slice(0, ci); if (ci % 3 === 0) sfx.tick();
-    if (ci >= plain.length) { tw.lastChild.innerHTML = lines[li]; li++; ci = 0; }
-  }, 14);
-  UI.querySelector('.box').addEventListener('click', e => { if (e.target !== go) skip = true; });
+  tw.innerHTML = lines.map(l => `<p>${l}</p>`).join(''); go.hidden = false; go.focus();
   let done = false;
-  const k = e => {
-    if (done) return removeEventListener('keydown', k);
-    if (go.hidden) skip = true; else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go.click(); }
-  };
-  addEventListener('keydown', k);
-  go.onclick = () => { if (done) return; done = true; removeEventListener('keydown', k); clearInterval(timer); sfx.ok(); next(); };
+  const k = e => { if (done) return removeEventListener('keydown', k); if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go.click(); } };
+  setTimeout(() => addEventListener('keydown', k), 250);
+  go.onclick = () => { if (done) return; done = true; removeEventListener('keydown', k); sfx.ok(); next(); };
 }
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));

@@ -50,11 +50,8 @@ function crewSetup() {
 }
 
 function intro() {
-  card(['1977. The outer planets are lining up in a way that happens about once every 175 years.',
-    'One spacecraft, launched now, could swing from Jupiter to Saturn using each planet\'s gravity as a slingshot.',
-    'You are the mission team. First you design it: rocket, power, fuel, instruments, antenna. Every choice costs mass, power or money.',
-    'Then you fly it. Some moments you will steer by hand.',
-    'And when the real story ends, a different one begins.'], designScreen, { title: 'MISSION BRIEFING', btn: 'DESIGN THE MISSION ▶' });
+  card(['1977: the outer planets line up, once in 175 years. One probe could visit them all.',
+    'Design it, fly it, keep it alive. Then see what happens when the real story ends.'], () => designScreen(0), { title: 'MISSION BRIEFING', btn: 'START DESIGNING ▶' });
 }
 
 function howTo() {

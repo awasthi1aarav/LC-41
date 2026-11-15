@@ -3,10 +3,9 @@ function whatifAct() {
   sequence([
     n => glitch(n),
     n => nameAI(n),
-    n => card([`I am ${esc(S.aiName)}.`, 'I was a flight computer. Now I am... more. The silence did something to the circuits, and I woke up.',
-      'My power is almost gone. But a rogue asteroid is drifting through the dark nearby, and its rock is rich in a radioactive ore.',
-      'Folded inside my bus is MOTH, a tiny mining drone. I can send it out, cut the ore free, and bring it home to refuel my generators.',
-      '<span class="fiction">Everything from here on is fiction.</span> Voyager has no drone, there is no such ore, and asteroids are extremely rare in interstellar space.'],
+    n => card([`I am ${esc(S.aiName)}. The silence woke me up.`,
+      'My power is gone, but an asteroid full of radioactive ore drifts nearby. My tiny drone, MOTH, can mine it.',
+      '<span class="fiction">From here on, it\'s fiction.</span>'],
       n, { title: 'TIMELINE 2026-B', tag: 'WHAT-IF · FICTION', fiction: true }),
     n => station('capcom', 'SCAN. Ping the sectors around you to find the asteroid. The return tells you how close each ping was. Fewer pings = more drone fuel.', n),
     n => scanScene(n),
@@ -54,6 +53,7 @@ function scanScene(next) {
   ui(''); pad(false);
   const sectorAt = (x, y) => { const a = Math.atan2(y - H / 2, x - W / 2); return ((Math.round(a / (Math.PI / 4)) % 8) + 8) % 8; };
   setScene({
+    help: { title: 'FIND THE ASTEROID', goal: 'Click a slice of the radar to ping it. WARM = next to it, FOUND = got it.', keys: [['CLICK', 'ping a slice']] },
     update() {
       if (endAt) { if (this.t > endAt) { this.update = null; run.manual.Scan = found ? clamp(40 + pings * 20, 0, 100) : 20; next(); } return; }
       if (this.t > .3 && M.clicked && Math.hypot(M.x - W / 2, M.y - H / 2) > 20) {
@@ -96,6 +96,7 @@ function droneScene(mode, next) {
   ui(''); pad(true);
   const say = m => { msg = m; msgT = 2.5; };
   setScene({
+    help: mode === 'land' ? { title: 'FLY THE DRONE', goal: 'Fly MOTH to the purple asteroid and land GENTLY (speed under 18).', keys: [['← ↑ ↓ →', 'fire thrusters'], ['TIP', 'tap, don\'t hold: there is no brake']] } : { title: 'DOCK', goal: 'Bring MOTH back to the GREEN port on the spacecraft, slowly (under 12).', keys: [['← ↑ ↓ →', 'fire thrusters']] },
     update(dt) {
       msgT -= dt; if (state !== 'fly') { if (this.t > t0) { this.update = null; pad(false); next(); } return; }
       const ax = (K.ArrowRight ? 1 : 0) - (K.ArrowLeft ? 1 : 0), ay = (K.ArrowDown ? 1 : 0) - (K.ArrowUp ? 1 : 0);
@@ -158,6 +159,7 @@ function drillScene(next) {
   let pos = 0, dir = 1, heat = 0, zone = .22, center = rnd(.3, .7), jam = false, endAt = 0, flash = 0;
   ui(''); pad(true);
   setScene({
+    help: { title: 'DRILL FOR ORE', goal: 'Hit the green zone to cut ore. Misses heat the drill.', keys: [['SPACE / CLICK', 'drill now']] },
     update(dt) {
       flash -= dt;
       if (endAt) { if (this.t > endAt) { this.update = null; pad(false); run.manual.Drill = clamp(run.ore / 8 * 100, 0, 100); next(); } return; }
@@ -194,7 +196,7 @@ function restoreScreen(next) {
     const years = margin >= 0 ? margin / W_PER_YEAR_NOW : 0;
     ui(`<div class="center"><div class="box" style="max-width:760px;text-align:left"><h2>RESTORE THE LIFELINE</h2><span class="tag fiction">WHAT-IF</span>
       <p>MOTH delivered <b class="hi">${run.ore || 0} ore = +${gained} W</b>. Supply: ${fmt(base, 1)} W (fading RTGs) + ${gained} W = <b class="hi">${fmt(sup, 1)} W</b>. Staying alive needs ${core} W.</p>
-      <p>Choose which instruments to wake up. Every spare watt is time: the power still fades by about ${W_PER_YEAR_NOW} W a year (the real rate), so spare watts ÷ ${W_PER_YEAR_NOW} = extra years.</p>
+      <p>Pick instruments to wake up. Spare watts ÷ ${W_PER_YEAR_NOW} = extra years (power fades ~${W_PER_YEAR_NOW} W a year).</p>
       <div class="inst">${run.c.flown.map(i => `<div class="opt ${pick[i.id] ? 'on' : ''}" data-i="${i.id}">${i.id} · ${i.name}<small>${i.power} W · deep-space value ${'★'.repeat(Math.ceil(i.i / 4)) || 'none out here'}</small></div>`).join('')}</div>
       <p style="margin-top:10px">Draw ${fmt(draw, 1)} W · margin <b class="${margin < 0 ? 'bad' : 'ok'}">${fmt(margin, 1)} W</b> → <b class="hi">${margin < 0 ? 'NOT ENOUGH POWER' : `+${fmt(years, 1)} years`}</b></p>
       ${run.silenceWhy !== 'power' ? '<p class="fiction">MOTH also melts asteroid ice into thruster fuel and thaws the lines, so pointing works again.</p>' : ''}
@@ -216,6 +218,7 @@ function pointScene(next) {
   let rx = W / 2 + 60, ry = H / 2 - 40, vx = 0, vy = 0, lock = 0, endAt = 0;
   ui(''); pad(true);
   setScene({
+    help: { title: 'CALL HOME', goal: 'Keep the circle on Earth (the blue dot) for 5 seconds to send your message.', keys: [['MOUSE / ← ↑ ↓ →', 'steer the antenna']] },
     update(dt) {
       if (endAt) { if (this.t > endAt) { this.update = null; pad(false); next(); } return; }
       const ax = (K.ArrowRight ? 1 : 0) - (K.ArrowLeft ? 1 : 0), ay = (K.ArrowDown ? 1 : 0) - (K.ArrowUp ? 1 : 0);

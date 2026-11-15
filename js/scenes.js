@@ -121,6 +121,7 @@ function imaging(P, next) {
     return { x, y, vis: !behind && x > -10 && x < W + 10, r: tg.r };
   };
   setScene({
+    help: cam ? { title: P.name + ' FLYBY', goal: 'Photograph the labelled targets before they fly past. Each photo uses data space.', keys: [['MOUSE / ← ↑ ↓ →', 'aim the camera'], ['CLICK / SPACE', 'take a photo']] } : null,
     update(dt) {
       const t = this.t; msgT -= dt; flash -= dt;
       if (!cam) { if (t > dur) end(); return; }
@@ -181,10 +182,8 @@ function imaging(P, next) {
     run.sci.planet += autoSci * keep * 0.8;
     run.manual[P.name] = cam ? got.size / P.targets.length * 100 : 50;
     pad(false);
-    card([`${P.name} ENCOUNTER COMPLETE`,
-      cam ? `Targets imaged: ${got.size} of ${P.targets.length}.` : 'No imaging this time.',
-      `Data made: ${fmt(totalMade)} units · sent or stored: ${fmt(totalMade - lost - over)} · lost: <span class="${lost + over ? 'bad' : 'ok'}">${fmt(lost + over)}</span>.`,
-      lost + over ? 'CAPCOM note: a bigger dish or a tape recorder would have saved the lost data.' : 'CAPCOM note: every bit made it home.'], next, { title: 'DEBRIEF' });
+    card([`${got.size} of ${P.targets.length} targets photographed.`,
+      lost + over ? `<span class="bad">${fmt(lost + over)} data units lost</span>: a bigger dish or a tape recorder would help.` : '<span class="ok">All data reached Earth.</span>'], next, { title: `${P.name}: DONE` });
   }
 }
 
@@ -194,6 +193,7 @@ function burnScene(next) {
   let dv = 0, burning = false, done = false;
   ui(''); pad(true);
   setScene({
+    help: { title: 'ENGINE BURN', goal: 'Fire the thrusters to fix your course. Stop inside the GREEN zone.', keys: [['HOLD SPACE', 'or hold the mouse: burn'], ['LET GO', 'when the bar is in the green']] },
     update(dt) {
       if (done) return;
       const hold = K[' '] || M.down;
@@ -219,9 +219,8 @@ function burnScene(next) {
     S.run.manual.Burn = q * 100;
     const miss = Math.round(6490 * (1 + err * 2));
     (err <= band ? sfx.ok : sfx.bad)();
-    setTimeout(() => card([err <= band ? 'BURN GOOD. Right in the window.' : `Burn ${dv > target ? 'long' : 'short'} by ${fmt(err, 2)} m/s.`,
-      `Hydrazine used: ${fmt(10 + waste, 1)} kg (${fmt(waste, 1)} kg wasted). Left: ${fmt(S.run.hyd, 1)} kg.`,
-      `Predicted closest pass of Titan: ${miss.toLocaleString()} km (the real Voyager 1 passed at about 6,490 km).`], next, { title: 'BURN REPORT' }), 500);
+    setTimeout(() => card([err <= band ? '<span class="ok">Perfect burn.</span>' : `Off by ${fmt(err, 2)} m/s.`,
+      `Fuel used: ${fmt(10 + waste, 1)} kg${waste > 1 ? ` (${fmt(waste, 1)} kg wasted)` : ''}.`], next, { title: 'BURN REPORT' }), 500);
   }
 }
 
@@ -233,6 +232,7 @@ function pbdScene(next) {
   let cx = 200, cy = 140, frames = 8, found = false, msg = '', msgT = 0, flash = 0, drag = null;
   ui(`<div class="hud"><span></span></div>`, true); pad(true);
   setScene({
+    help: { title: 'PALE BLUE DOT', goal: 'Find Earth: one tiny blue pixel close to the Sun. Put it in the circle and shoot. 8 photos.', keys: [['DRAG / ← ↑ ↓ →', 'look around'], ['SPACE', 'take a photo']] },
     update(dt) {
       msgT -= dt; flash -= dt;
       cx = clamp(cx + ((K.ArrowRight ? 1 : 0) - (K.ArrowLeft ? 1 : 0)) * 220 * dt, 0, WW - W);
@@ -306,6 +306,7 @@ function longNight(next) {
     r();
   }
   setScene({
+    help: { title: 'THE LONG NIGHT', goal: 'Power fades every year. Keep DRAW below SUPPLY by switching things off, or the computer does it for you.', keys: [['CLICK a load', 'or press 1-9: on / off'], ['KEEP ON', 'thruster line heaters (or the fuel freezes)'], ['HOLD F', 'fast-forward']] },
     update(dt) {
       if (ended) return;
       for (let i = 1; i <= 10; i++) if (hit(String(i % 10))) toggle(i - 1);

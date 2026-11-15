@@ -70,3 +70,26 @@ td.n{text-align:right}
 #pad button{font-size:16px;padding:12px 14px;margin:0;opacity:.85}
 @media (max-width:820px){.grid,.two{grid-template-columns:1fr}.meters{grid-template-columns:repeat(3,1fr)}.inst{grid-template-columns:1fr}html,body{font-size:18px}}
 @media (hover:hover) and (pointer:fine){#pad{display:none}}
+/* step-by-step design */
+.design{max-width:980px;margin:0 auto;padding:10px 14px 96px;font-size:22px}
+.design .meters{grid-template-columns:repeat(5,1fr)}
+.design .meter{font-size:20px}
+.step{text-align:left;margin-top:12px}
+.step h2{font-size:clamp(16px,2.4vw,24px);margin:.1em 0 .3em}
+.step h3{margin-top:14px}
+.opt.big{padding:10px 14px;font-size:22px;margin:6px 0}
+.opt.big b{font-weight:400;color:var(--hi)}
+.opt.big small{font-size:18px}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.cols3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.cols .opt,.cols3 .opt{margin:0}
+.dots{display:flex;gap:4px;flex-wrap:wrap;justify-content:center}
+.dot{padding:8px 11px;margin:0}
+.design .foot{max-width:none}
+@media (max-width:820px){.cols,.cols3{grid-template-columns:1fr}.design .meters{grid-template-columns:repeat(3,1fr)}}
+#help{z-index:6;pointer-events:auto}
+.helpbox{text-align:center;max-width:620px}
+.helpbox .goal{font-size:24px}
+.keys{display:flex;flex-direction:column;gap:8px;margin:14px 0;align-items:center}
+.keys div{display:flex;gap:12px;align-items:center;font-size:22px}
+.key{font-family:VT323,monospace;font-size:22px;border:2px solid var(--fg);border-bottom-width:4px;padding:6px 8px;color:var(--hi);min-width:120px;display:inline-block}
