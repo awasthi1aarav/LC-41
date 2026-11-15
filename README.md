@@ -43,7 +43,3 @@ Everything before the timeline divergence follows the real Voyager 1 mission. Ma
 ## Built with
 
 Plain HTML, CSS and JavaScript: no frameworks, no build step, no server. Chiptune music and sound effects are generated live with the Web Audio API. Open `index.html` to play offline.
-
-## AI disclosure
-
-This game was built with the help of an AI coding assistant (Claude by Anthropic). The team set the story, mission concept and game direction and tested the game; the AI wrote most of the code and helped research the Voyager facts.
